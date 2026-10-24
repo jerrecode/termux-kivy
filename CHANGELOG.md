@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.3 — 2026-10-24
+
+### Device reliability, visual checks and lifecycle hardening
+
+- Close Popen stdout pipes on success, failure, timeout and interruption; log cleanup and regression-test ResourceWarning-free operation.
+- Check native Android foreground Window and selected UIAutomator target package before injecting touch/keyboard events, detecting unexpected focus/lifecycle changes.
+- Log device failure context: fixture trace, process exit status, window/Activity state, logcat, and optional PNG evidence, followed by native fixture cleanup.
+- Always capture real screenshots in memory for dimensional and post-interaction change checks; optionally persist PNGs; measure changed pixels in actual label crop using Pillow when available.
+- Add opt-in landscape rotation and temporary display-size matrix validation; always restore original system settings/overrides in finally blocks.
+- Fix geometry check that could hide out-of-bounds portrait widgets by blindly accepting swapped dimensions. Active wm size overrides are respected, and rotation is corroborated by Android root-view bounds.
+- Add `--device-repeats 20` sequential reliability runs with mean/median/p95 durations and success ratio. ADB preflight fails fast and reports failure correctly.
+- Expand offline tests for screenshot pixel changes, native focus parsing, device state restoration, timeout cleanup and repeat sequencing; CI installs Pillow to exercise pixel checks.
+- Full Android testing requires an authorized Termux phone and is not executed on the cloud CI runner.
+
 ## 0.1.2 — 2026-10-24
 
 ### Full automated test pipeline

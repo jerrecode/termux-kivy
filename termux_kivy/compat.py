@@ -14,7 +14,7 @@ from .kv import Builder, Factory
 
 _PACKAGES = {"kivy", "kivy.uix", "kivy.core"}
 _MODULES = {
-    "kivy": {"__version__": "termux-kivy-0.1.2-subset", "require": lambda *_: None},
+    "kivy": {"__version__": "termux-kivy-0.1.3-subset", "require": lambda *_: None},
     "kivy.app": {"App": core.App},
     "kivy.event": {"EventDispatcher": core.EventDispatcher},
     "kivy.clock": {"Clock": core.Clock},

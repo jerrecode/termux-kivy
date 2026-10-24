@@ -6,7 +6,7 @@ This is a new implementation, not a copy of `tgk` or `tgk-tools`, and **not the 
 
 ## Status
 
-Early functional implementation. Desktop/mock integration tests run without Android; the actual Android Termux:GUI path requires device testing. See [Architecture](docs/architecture.md) and [Capabilities](docs/capabilities.md).
+Early functional implementation. Desktop/mock integration tests run in CI; user-supplied Termux device logs have also demonstrated native Android rendering, touch, checkbox and keyboard input. The optional hardware reliability and visual-matrix tests must still be run on a connected Android device for each release. See [Architecture](docs/architecture.md) and [Capabilities](docs/capabilities.md).
 
 ## Quick start on Android
 
@@ -46,11 +46,21 @@ Termux + Termux:GUI + authorized ADB setup to additionally drive real touch,
 keyboard and UIAutomator bounds checks. The default suite uses simulated
 native events and does not claim physical pixel verification.
 
+Run a 20-process physical stability check with:
+```bash
+./test-all.sh --device --device-repeats 20 --filter '^android\\.' --timeout 180
+```
+For optional screenshot PNGs and display geometry variation:
+```bash
+./test-all.sh --device --filter '^android\\.' \\
+  --device-screenshots --device-orientation --device-display-matrix
+```
+The display options change system settings temporarily and restore them afterward.
 See [full automation instructions](docs/automation.md).
 
 ## Maintenance
 
-See [CHANGELOG.md](CHANGELOG.md) for 0.1.1 native protocol fixes, lifecycle hardening, property observation, and performance improvements.
+See [CHANGELOG.md](CHANGELOG.md) for native protocol fixes, lifecycle hardening, property observation, and performance improvements.
 
 ## Design priorities
 
