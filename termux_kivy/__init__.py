@@ -2,7 +2,7 @@
 
 The default import never imports Kivy or Termux:GUI and installs no import hook.
 """
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .core import (
     App, BooleanProperty, BoxLayout, Button, CheckBox, Clock,

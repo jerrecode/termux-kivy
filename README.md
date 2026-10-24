@@ -34,6 +34,10 @@ instructions are not silently fabricated. See [Capabilities](docs/capabilities.m
 Run `termux-kivy doctor --json` on a desktop or phone to inspect Python dependencies
 without connecting to the plugin; use `--connect` for a real Termux:GUI handshake.
 
+## Maintenance
+
+See [CHANGELOG.md](CHANGELOG.md) for 0.1.1 native protocol fixes, lifecycle hardening, property observation, and performance improvements.
+
 ## Design priorities
 
 - Lazy import of the Android adapter; pure-Python core importable on desktop.

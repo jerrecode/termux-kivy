@@ -1,4 +1,4 @@
-# Exact compatibility and capability contract (0.1.0)
+# Exact compatibility and capability contract (0.1.1)
 
 The public import `termux_kivy` exposes basic Kivy-style names. A program must explicitly use this API or activate the optional import shim before importing `kivy`.
 
