@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from collections import deque
 import math
+from pathlib import Path
 from queue import Empty, Full, Queue
 import threading
 import time
 
 from .core import (
     BoxLayout, Button, CheckBox, Clock, FloatLayout, GridLayout,
-    Label, ProgressBar, ScrollView, Switch, TextInput, Widget,
+    Image, Label, ProgressBar, ScrollView, Spinner, Switch, TextInput, ToggleButton, Widget,
 )
 
 
@@ -102,6 +103,10 @@ class TermuxBackend:
                 a, node.text, parent, singleline=not node.multiline, inputtype=inputtype
             )
             native.sendtextevent(True)
+        elif isinstance(node, ToggleButton):
+            native = tg.ToggleButton(a, parent, checked=node.state == 'down')
+            native.settext(node.text)
+            native.sendclickevent(True)
         elif isinstance(node, Button):
             native = tg.Button(a, node.text, parent)
             native.sendclickevent(True)
@@ -111,6 +116,15 @@ class TermuxBackend:
         elif isinstance(node, CheckBox):
             native = tg.Checkbox(a, node.text, parent, checked=node.active)
             native.sendclickevent(True)
+        elif isinstance(node, Spinner):
+            native = tg.Spinner(a, parent)
+            native.setlist([str(x) for x in node.values])
+            if node.text in node.values:
+                native.selectitem(node.values.index(node.text))
+        elif isinstance(node, Image):
+            native = tg.ImageView(a, parent)
+            if node.source:
+                native.setimage(self._read_image(node.source))
         elif isinstance(node, Label):
             native = tg.TextView(a, node.text, parent)
         elif isinstance(node, ProgressBar):
@@ -176,12 +190,21 @@ class TermuxBackend:
                 if isinstance(node, ScrollView):
                     n.setheight(0)
                     n.setlinearlayoutparams(1)
-                elif isinstance(node, (Button, TextInput, CheckBox, Switch)):
+                elif isinstance(node, (Button, TextInput, CheckBox, Switch, Spinner)):
                     n.setheight(48)
         for name in ("visible", "disabled", "background_color", "font_size",
-                     "active", "value", "max"):
+                     "active", "value", "max", "state"):
             if hasattr(type(node), name):
                 self.invalidate(node, name)
+
+    @staticmethod
+    def _read_image(source):
+        path = Path(source)
+        if path.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            raise ValueError("Image requires a PNG or JPEG file")
+        if not path.is_file() or path.stat().st_size > 8_000_000:
+            raise ValueError("Image does not exist or exceeds the 8MB limit")
+        return path.read_bytes()
 
     @staticmethod
     def _dimension(value):
@@ -228,7 +251,7 @@ class TermuxBackend:
         if name in ("orientation", "cols", "multiline", "password"):
             raise UnsupportedOperation(f"live mutation of {name} requires re-mount")
         state = self._state[node]
-        if name in ("text", "font_size") and isinstance(node, (Label, TextInput)):
+        if name in ("text", "font_size") and isinstance(node, (Label, TextInput)) and not isinstance(node, Spinner):
             value = node.text if name == "text" else (
                 int(round(node.font_size)) if isinstance(node, Label) else None
             )
@@ -250,6 +273,20 @@ class TermuxBackend:
                 return
             key, value = name, self._dimension(value)
             fn = n.setwidth if name == "width" else n.setheight
+        elif name == "source" and isinstance(node, Image):
+            if not node.source:
+                return
+            key, value, fn = name, node.source, lambda _source: n.setimage(self._read_image(_source))
+        elif name == "values" and isinstance(node, Spinner):
+            key, value, fn = name, tuple(node.values), lambda values: n.setlist(list(map(str, values)))
+        elif name == "text" and isinstance(node, Spinner):
+            if node.text not in node.values:
+                return
+            key, value, fn = "selected", node.values.index(node.text), n.selectitem
+        elif name == "state" and isinstance(node, ToggleButton):
+            if node.state not in ("normal", "down"):
+                raise ValueError("toggle state must be normal or down")
+            key, value, fn = "checked", node.state == "down", n.setchecked
         elif name == "active" and isinstance(node, CheckBox):
             key, value, fn = name, node.active, n.setchecked
         elif name in ("value", "max") and isinstance(node, ProgressBar):
@@ -310,11 +347,21 @@ class TermuxBackend:
             # EditText and destroying cursor position / composing text.
             self._state[node]["text"] = value
             node.text = value
+        elif self._is(event, "itemselected") and isinstance(node, Spinner):
+            try:
+                index = int(event.value.get("selected"))
+            except (TypeError, ValueError):
+                return
+            if 0 <= index < len(node.values):
+                self._state[node]["selected"] = index
+                node.text = str(node.values[index])
         elif self._is(event, "click"):
             if node.disabled:
                 return
             if isinstance(node, CheckBox) and "set" in event.value:
                 node.active = bool(event.value["set"])
+            if isinstance(node, ToggleButton) and "set" in event.value:
+                node.state = "down" if event.value["set"] else "normal"
             if isinstance(node, Button):
                 node.dispatch("on_press")
                 node.dispatch("on_release")
@@ -369,5 +416,5 @@ class TermuxBackend:
                 try:
                     self._close()
                 finally:
-                    if closing_activity is not None and not closing_activity.finished if hasattr(closing_activity, 'finished') else closing_activity is not None and not self._stopping:
+                    if closing_activity is not None and not self._stopping:
                         closing_activity.finish()
