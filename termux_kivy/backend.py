@@ -275,9 +275,13 @@ class TermuxBackend:
         nodes = list(root.walk())
         if not nodes or nodes[0]._backend is not self:
             return
-        for node in reversed(nodes[1:]):
+        # Attempt native removal first. If send_msg fails, leave the Python
+        # model and ID map intact so the caller can retry safely.
+        if root._native is not None:
+            root._native.delete()
+            self.stats["deleted"] += 1
+        for node in reversed(nodes):
             self._detach(node, delete=False)
-        self._detach(root, delete=True)
 
     def invalidate(self, node, name):
         self._check_thread()
