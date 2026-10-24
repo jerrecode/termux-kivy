@@ -20,7 +20,10 @@ The public import `termux_kivy` exposes basic Kivy-style names. A program must e
 | KV Builder.load_string/load_file | Restricted | Literal values, simple attr references, id and callback method calls |
 | Kivy import aliases | Opt-in partial | Only selected modules; no automatic site or interpreter hijack |
 | Themes | Minimal | Explicit per-widget ARGB background integer; no design-system presets |
-| Image, Spinner, Slider, ToggleButton | Planned | Not included in initial native baseline |
+| Image | Implemented subset | PNG/JPEG local file (max 8MB) to native ImageView |
+| Spinner | Implemented subset | Native Spinner with values, selected index and text synchronization |
+| ToggleButton | Implemented subset | Native ToggleButton and state synchronization |
+| Slider | Planned | Requires shared-buffer drawing and touch mapping |
 | Canvas / InstructionGroup / Shader / OpenGL | Not supported | Requires separate rendering and input backend |
 | Kivy Window, gesture recognizers, multitouch | Not supported | Requires native input mappings and geometry |
 | Async file/media/pipeline tools | Out of scope | Separate from UI runtime; use standard Python or third-party libraries |
