@@ -68,7 +68,7 @@ Every mounted model node has one native view, a backend owner, and (if exposed b
 
 **Phase A (current):** native common controls, reactive fields, explicit subset import compatibility, restricted KV, tests and CI.
 
-**Phase B:** Android manual acceptance suite; native images, selection controls, rich typography, keyboard focus/validation, larger layouts, orientation/sizing and accessibility checks; robust restart/resume path; detailed installer diagnostics.
+**Phase B:** Android manual acceptance suite; additional media/selection controls, rich typography, keyboard focus/validation, larger layouts, orientation/sizing and accessibility checks; robust restart/resume path; detailed installer diagnostics.
 
 **Phase C:** specialized surfaces for truly custom drawing using documented shared buffers; dirty rectangles and optional native vector primitives where available; image caching with memory pressure accounting; pointer capture and gesture translation; virtualized lists for very large data sets.
 
