@@ -8,6 +8,7 @@ if [[ -z "${PREFIX:-}" || "${PREFIX}" != /data/data/com.termux/files/usr* ]]; th
 fi
 command -v python >/dev/null || { echo "Install Python: pkg install python" >&2; exit 2; }
 echo "Installing Termux-Kivy (no Kivy/SDL dependency)..."
+python -c "import setuptools" 2>/dev/null || python -m pip install "setuptools>=61"
 python -m pip install --no-build-isolation -e "$ROOT"
 python -m pip install 'termuxgui>=0.1.5'
 python - <<'PY'
