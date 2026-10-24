@@ -90,12 +90,12 @@ package="com.termux" bounds="[0,0][360,50]"/></hierarchy>"""
 
     def test_display_override_used_for_geometry_not_physical_size(self):
         with patch.object(driver, "adb_run",
-                          return_value="Physical size: 1080x2392\\nOverride size: 360x720"):
+                          return_value="Physical size: 1080x2392\nOverride size: 360x720"):
             driver.verify_geometry(screen(), "adb", None)
         overwide = screen()
         overwide[0] = node("TK-E2E-READY", (0, 0, 480, 50))
         with patch.object(driver, "adb_run",
-                          return_value="Physical size: 1080x2392\\nOverride size: 360x720"):
+                          return_value="Physical size: 1080x2392\nOverride size: 360x720"):
             with self.assertRaises(AssertionError):
                 driver.verify_geometry(overwide, "adb", None)
 
@@ -104,13 +104,13 @@ package="com.termux" bounds="[0,0][360,50]"/></hierarchy>"""
         def restore(*args):
             restored.append(args[-2:])
         with patch.object(driver, "snapshot_android_setting",
-                          side_effect=["1", "0"]), \\
+                          side_effect=["1", "0"]), \
              patch.object(driver, "capture",
-                          return_value={"dimensions": (1080, 2392)}), \\
-             patch.object(driver, "adb_run", return_value=""), \\
-             patch.object(driver, "ensure_foreground"), \\
-             patch.object(driver.time, "sleep"), \\
-             patch.object(driver, "read_ui", side_effect=RuntimeError("UI lost")), \\
+                          return_value={"dimensions": (1080, 2392)}), \
+             patch.object(driver, "adb_run", return_value=""), \
+             patch.object(driver, "ensure_foreground"), \
+             patch.object(driver.time, "sleep"), \
+             patch.object(driver, "read_ui", side_effect=RuntimeError("UI lost")), \
              patch.object(driver, "restore_android_setting", side_effect=restore):
             with self.assertRaises(RuntimeError):
                 driver.check_orientation("adb", None, "/sdcard/test.xml", 4)
@@ -123,9 +123,9 @@ package="com.termux" bounds="[0,0][360,50]"/></hierarchy>"""
         def fake(*args, **kwargs):
             calls.append(args)
             return "Physical size: 1080x2392"
-        with patch.object(driver, "adb_run", side_effect=fake), \\
-             patch.object(driver.time, "sleep"), \\
-             patch.object(driver, "ensure_foreground"), \\
+        with patch.object(driver, "adb_run", side_effect=fake), \
+             patch.object(driver.time, "sleep"), \
+             patch.object(driver, "ensure_foreground"), \
              patch.object(driver, "read_ui", side_effect=RuntimeError("lost GUI")):
             with self.assertRaises(RuntimeError):
                 driver.check_display_matrix("adb", None, "/sdcard/test.xml", 4)
