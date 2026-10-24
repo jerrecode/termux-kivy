@@ -20,6 +20,7 @@ import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from android_diagnostics import (
     capture, collect_failure, pixels_changed, require_foreground,
     restore_android_setting, screen_size_settings, snapshot_android_setting,
