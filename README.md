@@ -13,9 +13,26 @@ Early functional implementation. Desktop/mock integration tests run without Andr
 1. Install Termux and the matching **Termux:GUI** Android plugin from compatible sources.
 2. In Termux run `pkg install python git`.
 3. Clone this repository, then execute `./install-termux.sh`.
-4. Run `python examples/counter.py`.
+4. Run `termux-kivy doctor --connect` to verify the plugin connection.
+5. Run `termux-kivy demo` (or `python examples/counter.py`).
 
 The Python bindings are provided by the independent `termuxgui` project. No root privileges and no Kivy/SDL/OpenGL runtime are needed for native controls.
+
+## Use existing Kivy-style imports where supported
+
+```python
+from termux_kivy.compat import activate
+activate()  # before any import of kivy.*
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+```
+
+Only a small documented subset is available. Unsupported Kivy classes and rendering
+instructions are not silently fabricated. See [Capabilities](docs/capabilities.md).
+
+Run `termux-kivy doctor --json` on a desktop or phone to inspect Python dependencies
+without connecting to the plugin; use `--connect` for a real Termux:GUI handshake.
 
 ## Design priorities
 
