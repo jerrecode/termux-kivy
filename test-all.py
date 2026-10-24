@@ -115,7 +115,8 @@ def discover_cases():
     ]
 
 
-def all_cases(include_device=False, adb="adb", serial=None, device_repeats=1,\n              device_options=()):
+def all_cases(include_device=False, adb="adb", serial=None, device_repeats=1,
+              device_options=()):
     cases = discover_cases()
     for scenario in ("counter", "typing", "selection", "layout", "dynamic", "failure"):
         cases.append(Case(
@@ -295,7 +296,8 @@ def main(argv=None):
     )
     transcript = Transcript()
     results = []
-    interrupted = False\n    preflight_failure = False
+    interrupted = False
+    preflight_failure = False
     try:
         transcript.write(f"TEST RUN START; python={sys.version.split()[0]}; pid={os.getpid()}")
         transcript.write(f"Root: {ROOT}")
