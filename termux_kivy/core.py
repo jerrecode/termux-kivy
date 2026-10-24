@@ -71,7 +71,9 @@ class _ObservableList(list):
         owner = self._owner
         attached = owner.__dict__.get(self._name) is self
         if attached:
-            owner._before_change(self._name, self)
+            before_change = getattr(owner, "_before_change", None)
+            if before_change is not None:
+                before_change(self._name, self)
         before = list(self)
         result = getattr(super(), action)(*args, **kwargs)
         if attached and self != before:
@@ -139,7 +141,9 @@ class ListProperty(Property):
         old = self.__get__(instance)
         if old == value:
             return
-        instance._before_change(self.name, value)
+        before_change = getattr(instance, "_before_change", None)
+        if before_change is not None:
+            before_change(self.name, value)
         instance.__dict__[self.name] = _ObservableList(
             list(value), instance, self.name
         )
