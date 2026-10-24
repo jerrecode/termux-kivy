@@ -6,12 +6,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import dataclass
 import heapq
 import itertools
 import math
 import time
-from typing import Callable
 
 
 class Property:
@@ -61,16 +59,98 @@ class ObjectProperty(Property):
     pass
 
 
+class _ObservableList(list):
+    """List that reports in-place changes without altering normal list behavior."""
+
+    def __init__(self, iterable, owner, name):
+        super().__init__(iterable)
+        self._owner = owner
+        self._name = name
+
+    def _mutate(self, action, *args, **kwargs):
+        owner = self._owner
+        attached = owner.__dict__.get(self._name) is self
+        if attached:
+            owner._before_change(self._name, self)
+        before = list(self)
+        result = getattr(super(), action)(*args, **kwargs)
+        if attached and self != before:
+            owner._changed(self._name, self)
+        return result
+
+    def append(self, item):
+        return self._mutate("append", item)
+
+    def extend(self, values):
+        return self._mutate("extend", values)
+
+    def insert(self, index, value):
+        return self._mutate("insert", index, value)
+
+    def pop(self, index=-1):
+        return self._mutate("pop", index)
+
+    def remove(self, value):
+        return self._mutate("remove", value)
+
+    def clear(self):
+        return self._mutate("clear")
+
+    def reverse(self):
+        return self._mutate("reverse")
+
+    def sort(self, *args, **kwargs):
+        return self._mutate("sort", *args, **kwargs)
+
+    def __setitem__(self, index, value):
+        return self._mutate("__setitem__", index, value)
+
+    def __delitem__(self, index):
+        return self._mutate("__delitem__", index)
+
+    def __iadd__(self, values):
+        self._mutate("__iadd__", values)
+        return self
+
+    def __imul__(self, multiplier):
+        self._mutate("__imul__", multiplier)
+        return self
+
+
 class ListProperty(Property):
+    """Kivy-like observable list, including append, slice and reorder updates."""
+
     def __init__(self, default=None):
-        super().__init__([] if default is None else default, lambda v: isinstance(v, list))
+        super().__init__([] if default is None else list(default),
+                         lambda v: isinstance(v, list))
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+        if self.name not in instance.__dict__:
+            instance.__dict__[self.name] = _ObservableList(
+                deepcopy(self.default), instance, self.name
+            )
+        return instance.__dict__[self.name]
+
+    def __set__(self, instance, value):
+        if not isinstance(value, list):
+            raise ValueError(f"{self.name} must be a list")
+        old = self.__get__(instance)
+        if old == value:
+            return
+        instance._before_change(self.name, value)
+        instance.__dict__[self.name] = _ObservableList(
+            list(value), instance, self.name
+        )
+        instance._changed(self.name, instance.__dict__[self.name])
 
 
 class EventDispatcher:
     def __init__(self, **properties):
         self._bindings = defaultdict(list)
         for name, value in properties.items():
-            if not hasattr(type(self), name):
+            if not isinstance(getattr(type(self), name, None), Property):
                 raise TypeError(f"unsupported property {type(self).__name__}.{name}")
             setattr(self, name, value)
 
@@ -122,9 +202,17 @@ class Widget(EventDispatcher):
     def _before_change(self, name, value):
         if self._backend is not None:
             self._backend._check_thread()
-            if name in ('orientation', 'cols', 'multiline', 'password'):
-                from .backend import UnsupportedOperation
-                raise UnsupportedOperation(f'live mutation of {name} requires re-mount')
+            from .backend import UnsupportedOperation
+            if name in ("orientation", "cols", "multiline", "password"):
+                raise UnsupportedOperation(f"live mutation of {name} requires re-mount")
+            if name == "text" and isinstance(self, ToggleButton) and value:
+                raise UnsupportedOperation(
+                    "native ToggleButton cannot display custom text"
+                )
+            if name == "state" and isinstance(self, ToggleButton) and value not in ("normal", "down"):
+                raise ValueError("ToggleButton.state must be normal or down")
+            if name == "max" and isinstance(self, ProgressBar) and value <= 0:
+                raise ValueError("ProgressBar.max must be positive")
 
     def _changed(self, name, value):
         super()._changed(name, value)
