@@ -5,7 +5,6 @@ All native calls happen on the owning UI thread. No global import hooks.
 """
 from __future__ import annotations
 
-from collections import deque
 import math
 from pathlib import Path
 from queue import Empty, Full, Queue
@@ -105,7 +104,11 @@ class TermuxBackend:
             native.sendtextevent(True)
         elif isinstance(node, ToggleButton):
             native = tg.ToggleButton(a, parent, checked=node.state == 'down')
-            native.settext(node.text)
+            if node.text:
+                raise UnsupportedOperation(
+                    "Termux:GUI ToggleButton cannot display custom text; "
+                    "use a separate Label beside the toggle"
+                )
             native.sendclickevent(True)
         elif isinstance(node, Button):
             native = tg.Button(a, node.text, parent)
@@ -144,9 +147,9 @@ class TermuxBackend:
         # Pre-order, parent-first, without recursion or repeated list scans.
         added = []
         try:
-            pending = [(root, parent)]
+            pending = [(root, parent, None)]
             while pending:
-                node, p = pending.pop()
+                node, p, child_position = pending.pop()
                 native = self._create(node, p)
                 node._native = native
                 node._backend = self
@@ -159,11 +162,18 @@ class TermuxBackend:
                 added.append(node)
                 self.stats["created"] += 1
                 self._initial_style(node)
-                for child in reversed(node.children):
-                    pending.append((child, native))
+                if isinstance(node.parent, GridLayout):
+                    cols = int(node.parent.cols)
+                    native.setgridlayoutparams(child_position // cols, child_position % cols)
+                for index in range(len(node.children) - 1, -1, -1):
+                    pending.append((node.children[index], native, index))
         except BaseException:
-            for node in reversed(added):
-                self._detach(node, delete=True)
+            # Deleting the subtree root removes Android descendants too.
+            # Avoid duplicate deleteView calls on already removed children.
+            for descendant in reversed(added[1:]):
+                self._detach(descendant, delete=False)
+            if added:
+                self._detach(added[0], delete=True)
             raise
 
     def _initial_style(self, node):
@@ -283,6 +293,12 @@ class TermuxBackend:
             if node.text not in node.values:
                 return
             key, value, fn = "selected", node.values.index(node.text), n.selectitem
+        elif name == "text" and isinstance(node, ToggleButton):
+            if node.text:
+                raise UnsupportedOperation(
+                    "Termux:GUI ToggleButton cannot display custom text"
+                )
+            return
         elif name == "state" and isinstance(node, ToggleButton):
             if node.state not in ("normal", "down"):
                 raise ValueError("toggle state must be normal or down")
@@ -309,13 +325,19 @@ class TermuxBackend:
         if type(budget) is not int or budget <= 0:
             raise ValueError("flush budget must be positive")
         processed = 0
-        # O(unique dirty properties); writes are deduplicated by final value.
-        for node, fields in list(self._dirty.items()):
-            if processed >= budget:
-                break
-            self._dirty.pop(node, None)
-            for field in sorted(fields):
-                self._update(node, field)
+        # Iterate only the allotted nodes; avoid snapshotting the whole dictionary.
+        # Re-queue failed and remaining fields so a transient IPC failure does
+        # not silently discard the last requested state.
+        while self._dirty and processed < budget:
+            node, fields = next(iter(self._dirty.items()))
+            self._dirty.pop(node)
+            ordered = sorted(fields)
+            for index, field in enumerate(ordered):
+                try:
+                    self._update(node, field)
+                except BaseException:
+                    self._dirty.setdefault(node, set()).update(ordered[index:])
+                    raise
             processed += 1
         return processed
 
@@ -348,19 +370,27 @@ class TermuxBackend:
             self._state[node]["text"] = value
             node.text = value
         elif self._is(event, "itemselected") and isinstance(node, Spinner):
-            try:
-                index = int(event.value.get("selected"))
-            except (TypeError, ValueError):
-                return
-            if 0 <= index < len(node.values):
+            # The real Python binding emits the selected *string*, not an
+            # index. Numeric-looking strings are still strings (e.g. "2026").
+            selection = event.value.get("selected")
+            if type(selection) is int:
+                index = selection if 0 <= selection < len(node.values) else None
+            else:
+                try:
+                    index = [str(value) for value in node.values].index(selection)
+                except ValueError:
+                    index = None
+            if index is not None:
                 self._state[node]["selected"] = index
                 node.text = str(node.values[index])
         elif self._is(event, "click"):
             if node.disabled:
                 return
             if isinstance(node, CheckBox) and "set" in event.value:
+                self._state[node]["active"] = bool(event.value["set"])
                 node.active = bool(event.value["set"])
             if isinstance(node, ToggleButton) and "set" in event.value:
+                self._state[node]["checked"] = bool(event.value["set"])
                 node.state = "down" if event.value["set"] else "normal"
             if isinstance(node, Button):
                 node.dispatch("on_press")
