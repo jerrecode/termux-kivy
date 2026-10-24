@@ -15,7 +15,7 @@ class _View:
         activity.views[self.id] = self
 
     def __getattr__(self, name):
-        if name.startswith(("set", "send")):
+        if name.startswith(("set", "send")) or name in ("selectitem", "refresh", "delete"):
             def record(*args):
                 self.calls.append((name, args))
             return record
