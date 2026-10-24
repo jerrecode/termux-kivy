@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+from importlib import metadata
 import json
 import os
 import platform
@@ -25,15 +26,26 @@ def doctor(*, connect=False):
         "android_plugin": "not_checked",
         "connected": False,
     }
+    if binding:
+        try:
+            report["termuxgui_python_version"] = metadata.version("termuxgui")
+        except metadata.PackageNotFoundError:
+            report["termuxgui_python_version"] = "unknown"
     if connect:
         if not binding:
             report["android_plugin"] = "cannot_test_without_binding"
         else:
             try:
                 import termuxgui as tg
-                with tg.Connection():
+                with tg.Connection() as connection:
                     report["connected"] = True
                     report["android_plugin"] = "connection_successful"
+                    getversion = getattr(connection, "getversion", None)
+                    if callable(getversion):
+                        try:
+                            report["android_plugin_version_code"] = getversion()
+                        except (OSError, RuntimeError, ValueError) as exc:
+                            report["version_query_error"] = f"{type(exc).__name__}: {exc}"
             except Exception as exc:
                 report["android_plugin"] = "connection_failed"
                 report["connection_error"] = f"{type(exc).__name__}: {exc}"
