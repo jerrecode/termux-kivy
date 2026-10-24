@@ -232,6 +232,7 @@ def check_orientation(adb, serial, remote, timeout, *, output_dir=None):
     old_rotation = snapshot_android_setting(adb_run, adb, serial, "system",
                                             "user_rotation")
     log(f"ORIENTATION original auto={old_auto!r} rotation={old_rotation!r}")
+    before = capture(adb, serial, "portrait-before-rotation", output_dir=output_dir)
     try:
         adb_run(adb, serial, "shell", "settings", "put", "system",
                 "accelerometer_rotation", "0")
@@ -241,7 +242,12 @@ def check_orientation(adb, serial, remote, timeout, *, output_dir=None):
         ensure_foreground(adb, serial, timeout)
         nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
         verify_geometry(nodes, adb, serial, count=1)
-        log("ORIENTATION PASS: landscape viewport has valid native control geometry")
+        after = capture(adb, serial, "landscape-rotation", output_dir=output_dir)
+        expected = tuple(reversed(before["dimensions"]))
+        check(after["dimensions"] == expected,
+              "screen rotated to landscape, not just geometrically rearranged",
+              expected=expected, actual=after["dimensions"])
+        log("ORIENTATION PASS: screenshot and native geometry validated")
     finally:
         restore_android_setting(adb_run, adb, serial, "system",
                                 "user_rotation", old_rotation)
@@ -266,7 +272,11 @@ def check_display_matrix(adb, serial, remote, timeout, *, output_dir=None):
         ensure_foreground(adb, serial, timeout)
         nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
         verify_geometry(nodes, adb, serial, count=1)
-        log("DISPLAY MATRIX PASS: valid geometry at reduced viewport")
+        screenshot = capture(adb, serial, "smaller-display", output_dir=output_dir)
+        check(screenshot["dimensions"] in (target, tuple(reversed(target))),
+              "screenshot reflects temporary display size",
+              expected=target, actual=screenshot["dimensions"])
+        log("DISPLAY MATRIX PASS: screenshot and native geometry validated")
     finally:
         if override is not None:
             adb_run(adb, serial, "shell", "wm", "size",
@@ -379,9 +389,11 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
                 time.sleep(1)
                 ensure_foreground(adb, serial, foreground_timeout)
                 if orientation_check:
-                    check_orientation(adb, serial, remote, foreground_timeout)
+                    check_orientation(adb, serial, remote, foreground_timeout,
+                                      output_dir=savedir)
                 if display_matrix:
-                    check_display_matrix(adb, serial, remote, foreground_timeout)
+                    check_display_matrix(adb, serial, remote, foreground_timeout,
+                                         output_dir=savedir)
             adb_run(adb, serial, "shell", "input", "keyevent", "4")
             try:
                 await_condition("fixture termination after Android back", lambda:
