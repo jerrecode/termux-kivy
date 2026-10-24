@@ -231,6 +231,29 @@ class Switch(CheckBox):
     pass
 
 
+class ToggleButton(Button):
+    state = StringProperty("normal")
+
+    def __init__(self, text="", state="normal", **kwargs):
+        if state not in ("normal", "down"):
+            raise ValueError("toggle state must be normal or down")
+        super().__init__(text=text, state=state, **kwargs)
+
+
+class Spinner(Label):
+    values = ListProperty()
+
+    def __init__(self, text="", values=None, **kwargs):
+        super().__init__(text=text, values=list(values or ()), **kwargs)
+
+
+class Image(Widget):
+    source = StringProperty("")
+
+    def __init__(self, source="", **kwargs):
+        super().__init__(source=source, **kwargs)
+
+
 class ProgressBar(Widget):
     value = NumericProperty(0)
     max = NumericProperty(100)
