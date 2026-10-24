@@ -14,8 +14,14 @@ class _View:
         self.kwargs = dict(kwargs, parent_id=getattr(parent, 'id', None))
         activity.views[self.id] = self
 
+    _METHODS = frozenset({
+        "setwidth", "setheight", "setlinearlayoutparams", "setgridlayoutparams",
+        "setvisibility", "setbackgroundcolor", "setclickable", "setmargin",
+        "sendclickevent", "sendtextevent", "sendtouchevent",
+    })
+
     def __getattr__(self, name):
-        if name.startswith(("set", "send")) or name in ("selectitem", "refresh", "delete"):
+        if name in self._METHODS:
             def record(*args):
                 self.calls.append((name, args))
             return record
@@ -36,11 +42,15 @@ class NestedScrollView(_View):
 class FrameLayout(_View):
     pass
 class Button(_View):
+    _METHODS = _View._METHODS | {"settext", "settextsize"}
+
     def __init__(self, activity, text, parent=None):
         super().__init__(activity, parent, text=text)
 class TextView(Button):
     pass
 class EditText(_View):
+    _METHODS = _View._METHODS | {"settext", "settextsize"}
+
     def __init__(self, activity, text, parent=None, **kwargs):
         super().__init__(activity, parent, text=text, **kwargs)
         self.text = text
@@ -53,13 +63,13 @@ class Checkbox(Button):
 class Switch(Checkbox):
     pass
 class ProgressBar(_View):
-    pass
+    _METHODS = _View._METHODS | {"setprogress"}
 class Spinner(_View):
-    pass
+    _METHODS = _View._METHODS | {"setlist", "selectitem"}
 class ToggleButton(_View):
-    pass
+    _METHODS = _View._METHODS | {"setchecked"}
 class ImageView(_View):
-    pass
+    _METHODS = _View._METHODS | {"setimage"}
 
 
 class Connection:
@@ -85,6 +95,7 @@ class Activity:
 
 
 class Event:
+    itemselected = "itemselected"
     click = "click"
     text = "text"
     back = "back"
