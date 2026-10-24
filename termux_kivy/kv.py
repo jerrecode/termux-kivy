@@ -97,7 +97,11 @@ class _Builder:
         ids = {}
         handlers = []
         for lineno, raw in enumerate(source.splitlines(), 1):
-            if not raw.strip() or raw.lstrip().startswith("#"):
+            if not raw.strip():
+                continue
+            if raw.lstrip().startswith("#:"):
+                raise KVError(f"line {lineno}: KV directives are unsupported")
+            if raw.lstrip().startswith("#"):
                 continue
             if "\t" in raw[:len(raw) - len(raw.lstrip())]:
                 raise KVError(f"line {lineno}: tabs forbidden in indentation")
