@@ -293,6 +293,11 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
     with tempfile.TemporaryDirectory(prefix="termux-kivy-native-e2e-") as workspace:
         trace = Path(workspace) / "state.json"
         remote = f"/sdcard/termux_kivy_ui_{os.getpid()}.xml"
+        savedir = (ROOT / "logs" / ("android-screenshots-"
+                   + datetime.now().strftime("%Y%m%d-%H%M%S")
+                   + "-" + str(os.getpid()))) if save_screenshots else None
+        log("SCREENSHOT MODE: in-memory captures"
+            + (f", saving additional PNG files to {savedir}" if savedir else ""))
         command = [
             sys.executable, "-u", str(FIXTURE), "--trace", str(trace)
         ]
@@ -312,19 +317,34 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
         try:
             await_condition("Termux:GUI fixture Activity ready", lambda:
                 (read_state(trace) or {}).get("ready") is True, timeout=15)
-            nodes = read_ui(adb, serial, remote)
+            ensure_foreground(adb, serial, foreground_timeout)
+            nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
             button, field, checkbox = verify_geometry(nodes, adb, serial)
+            before = capture(adb, serial, "before-tap", output_dir=savedir)
 
+            ensure_foreground(adb, serial, foreground_timeout)
             tap(adb, serial, button)
             clicked = await_condition(
                 "click callback", lambda: (read_state(trace) or {}).get("clicks") == 1
             )
             check(clicked, "actual physical tap triggered Python callback",
                   expected=True, actual=clicked)
-            updated_nodes = read_ui(adb, serial, remote)
-            by_text(updated_nodes, "TK-E2E-COUNT:1")
+            ensure_foreground(adb, serial, foreground_timeout)
+            updated_nodes = read_ui(adb, serial, remote,
+                                    expected_package="com.termux.gui")
+            status = by_text(updated_nodes, "TK-E2E-COUNT:1")
             log("ASSERT real label redraw PASS: TK-E2E-COUNT:1 is in native hierarchy")
+            after_tap = capture(adb, serial, "after-tap", output_dir=savedir)
+            if before["dimensions"] == after_tap["dimensions"]:
+                changed = pixels_changed(before, after_tap, region=status["bounds"])
+                if changed is not None:
+                    check(changed > 0, "screenshot changed inside counter label after tap",
+                          expected="nonzero changed-pixel fraction", actual=changed)
+            else:
+                log("SCREENSHOT DIMENSIONS CHANGED after button; "
+                    "native UI label was successfully verified")
 
+            ensure_foreground(adb, serial, foreground_timeout)
             tap(adb, serial, checkbox)
             checked = await_condition(
                 "checkbox callback", lambda:
@@ -334,7 +354,8 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
 
             # Fetch fresh bounds before keyboard interaction. Typing may resize
             # Android's viewport once the soft keyboard opens.
-            nodes = read_ui(adb, serial, remote)
+            ensure_foreground(adb, serial, foreground_timeout)
+            nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
             entry = by_class(nodes, "EditText")
             tap(adb, serial, entry)
             log("REAL KEYBOARD: typing ASCII sample Termux42 through adb input")
