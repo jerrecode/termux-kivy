@@ -1,7 +1,6 @@
 """Self-tests for the process-isolated transcript runner and its interaction scripts."""
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 import subprocess
 import sys
@@ -35,7 +34,7 @@ class TestAllHarnessTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             transcript = output.read_text(encoding="utf-8")
             self.assertIn("FINAL STATUS: PASSED", transcript)
-            self.assertIn("PROCESS", process.stdout.upper() if "process" in process.stdout.lower() else "PROCESS")
+            self.assertIn("Selected 1 tests", process.stdout)
             self.assertIn("SPAWNED pid=", transcript)
             self.assertIn("EXIT pid=", transcript)
             return transcript

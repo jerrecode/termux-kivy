@@ -34,6 +34,20 @@ instructions are not silently fabricated. See [Capabilities](docs/capabilities.m
 Run `termux-kivy doctor --json` on a desktop or phone to inspect Python dependencies
 without connecting to the plugin; use `--connect` for a real Termux:GUI handshake.
 
+## Automated test-all runner
+
+Run `./test-all.sh` for a **sequential, one-child-process-per-test** suite,
+with a one-second gap after every process exits. It prints verbose input,
+event and assertion diagnostics and writes one combined text transcript to
+`logs/` after the suite completes.
+
+Use `./test-all.sh --device --timeout 180` on a properly configured
+Termux + Termux:GUI + authorized ADB setup to additionally drive real touch,
+keyboard and UIAutomator bounds checks. The default suite uses simulated
+native events and does not claim physical pixel verification.
+
+See [full automation instructions](docs/automation.md).
+
 ## Maintenance
 
 See [CHANGELOG.md](CHANGELOG.md) for 0.1.1 native protocol fixes, lifecycle hardening, property observation, and performance improvements.
