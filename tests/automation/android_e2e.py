@@ -166,23 +166,26 @@ def verify_geometry(nodes, adb, serial, *, count=0):
     sequence = [ready, status, button, field, checkbox]
     log(f"SCREEN GEOMETRY: reported={w}x{h}; "
         f"ordered widget bounds={[node['bounds'] for node in sequence]!r}")
-    # Android reports wm dimensions in device orientation, while UIAutomator
-    # uses display coordinates. Accept a consistent transposition only when
-    # all controls fit it; never allow the unrelated max(w,h) for both axes.
-    candidates = [(w, h), (h, w)]
-    valid = [
-        (width, height)
-        for width, height in candidates
-        if all(
-            0 <= node["bounds"][0] < node["bounds"][2] <= width
-            and 0 <= node["bounds"][1] < node["bounds"][3] <= height
-            for node in sequence
-        )
+    # Never accept a transposed viewport merely because the target controls
+    # would happen to fit: that can hide an off-screen view in portrait.
+    # Trust the root/full-display UIAutomator bounds to justify swapping axes.
+    root_bounds = [
+        node["bounds"] for node in nodes
+        if node["class"].endswith("FrameLayout")
+        and node["bounds"][0:2] == (0, 0)
     ]
-    check(bool(valid), "all controls inside one actual display orientation",
-          expected=candidates,
-          actual=[node["bounds"] for node in sequence])
-    selected = valid[0]
+    viewport = max(root_bounds, key=lambda rect: rect[2] * rect[3]) if root_bounds else None
+    if viewport is not None and viewport[2:] == (h, w) and (w, h) != (h, w):
+        selected = (h, w)
+        log(f"ROTATED DISPLAY: Android root confirms transposed viewport {selected!r}")
+    else:
+        selected = (w, h)
+    check(all(
+        0 <= node["bounds"][0] < node["bounds"][2] <= selected[0]
+        and 0 <= node["bounds"][1] < node["bounds"][3] <= selected[1]
+        for node in sequence
+    ), "all controls inside validated native viewport",
+          expected=selected, actual=[node["bounds"] for node in sequence])
     log(f"SCREEN ORIENTATION: validated logical display extent {selected!r}")
     for node in sequence:
         l, t, r, b = node["bounds"]
