@@ -51,10 +51,10 @@ The first flow is construction and updates, the second returns native interactio
 
 1. **Native views rather than pixel rasterization for ordinary controls:** Android takes responsibility for layout, drawing and most input semantics. This avoids a Python graphics loop for labels and buttons, but inter-process communication still contributes latency.
 2. **Incremental view mutation:** insertion and deletion of children under compatible parents touch only the affected native subtree. `GridLayout` is explicitly frozen after mounting because its row count is declared when the native grid is created; silently modifying its content could produce invalid layout.
-3. **Dirty-state reconciliation:** multiple assignments to the same property before a flush produce at most one outbound setter call for that property. The backend also caches the last sent value, avoiding repeat IPC for identical values. It is a property invalidation algorithm, **not** a native transactional batch protocol; the underlying setter calls remain individual IPC messages.
+3. **Dirty-state reconciliation:** multiple assignments to the same property before a flush produce at most one outbound setter call for that property. The backend also caches both initial known native values and the last sent value, avoiding repeat IPC for identical values. Pending changes survive synchronous setter failures. It is a property invalidation algorithm, **not** a native transactional batch protocol; the underlying setter calls remain individual IPC messages.
 4. **Native IDs indexed into a dict:** events do not scan all widgets. Average lookup is O(1), memory O(N).
 5. **Iterative tree traversal:** view creation and removal avoid recursion-depth failure for deep trees. Insertion and mount work O(size of inserted subtree).
-6. **Bounded timers and ingress:** 64 timer callbacks per loop by default; worker updates enter a bounded FIFO. Long-running callbacks still block the UI and must be moved to workers.
+6. **Bounded timers and ingress:** 64 timer callbacks per loop by default; worker updates enter a bounded FIFO. Long-running callbacks still block the UI and must be moved to workers. Cancelled timers are compacted when the retained queue becomes sparse.
 7. **Thread confinement:** synchronous widget property mutations on a mounted tree are checked before assignment. Workers should schedule a callback using `backend.post()`.
 8. **Lazy external dependencies:** the Android binding is loaded only when a real backend is constructed. This minimizes start cost and supports desktop testing.
 
