@@ -55,3 +55,54 @@ CI runs each unit test file through Python's unittest discovery and also runs th
 ADB's `input` commands control the **selected authorized device**; do not use `--device` while sensitive screens are open. The fixture requests a GUI Activity, which can bring its window to the foreground. No root privileges are needed when ADB is properly authorized, but Android's permission/security model may prevent local ADB setup on some devices.
 
 The generated combined log can contain typed test strings and UI labels. Avoid sharing logs that include sensitive data from third-party windows (e.g. if the device UI test accidentally captures the wrong foreground screen).
+
+
+## Reliability stress testing (real Android)
+
+After ADB pairing and a successful single run, measure repeated physical-device reliability:
+
+```bash
+./test-all.sh --device --device-repeats 20 \
+  --filter '^android\\.' \
+  --timeout 180 --delay 1 \
+  --log-file logs/android-reliability-20.txt
+```
+
+Each iteration is a **fresh, isolated Python process**, never parallel. The transcript lists per-iteration results and aggregates the physical-device success rate, mean, median, p95, minimum and maximum wall-clock durations. One mandatory second separates iterations. An early **ADB preflight** checks for an authorized `adb get-state` device **before** running all the Python tests; a missing connection creates a failed report rather than 51 irrelevant test executions or a false PASS. The stress test is not run by cloud CI because no phone is attached.
+
+## Screenshot verification and display variants
+
+The real-device test always makes in-memory PNG screenshots: before click, after counter redraw, and after checkbox/keyboard input. PNG header and image dimensions are checked, SHA-256 digests logged, and distinct post-interaction output required. When Pillow is available, the counter's **actual screenshot crop** is compared pixel-by-pixel with its pre-click image; a nonzero changed-pixel fraction is required. Without Pillow, this pixel-level assertion is **not claimed**: native UIAutomator text and geometry verification remains active. Install Pillow to enable pixel comparison on the device:
+
+```bash
+python -c 'from PIL import Image; print(Image.__version__)'
+# If the import fails, install a compatible Pillow build in Termux.
+```
+
+To persist the screenshots as PNGs **in addition** to the normal single combined text log:
+
+```bash
+./test-all.sh --device --filter '^android\\.' --device-screenshots
+```
+
+The PNGs are placed in a timestamped ignored `logs/android-screenshots-*/` directory, not embedded as binary data in the TXT log. They can be inspected manually for visual rendering defects. A screenshot hash change does not prove every pixel is correct, and there is currently no golden-image reference catalog; the status-label crop comparison specifically tests a real redraw.
+
+Opt-in orientation and reduced-resolution tests exercise screen geometry and screenshots:
+
+```bash
+./test-all.sh --device --filter '^android\\.' \
+  --device-orientation --device-display-matrix --device-screenshots \
+  --device-foreground-timeout 6 --timeout 180
+```
+
+**Caution:** `--device-orientation` temporarily changes Android's `accelerometer_rotation` and `user_rotation` system settings; `--device-display-matrix` temporarily changes `wm size`. Both restore the original values via `finally` even after an assertion fails. Do not use those flags on a phone involved in important foreground work, and avoid manually interrupting the process by force-killing it before cleanup. Without these flags, the test does not modify system display settings.
+
+## Foreground, lifecycle and failure evidence
+
+Before GUI events, the hardware test now probes `adb shell dumpsys window` for the foreground package `com.termux.gui`. UIAutomator XML is also checked to ensure **all selected targets belong to that exact application**. If the wrong window is focused, the test fails rather than accidentally sending taps to Termux or another app.
+
+On native test failure, it attempts to log the fixture's atomic state trace, process exit status, `dumpsys window`, `dumpsys activity activities`, `pidof`, the last 180 lines of `logcat`, and an in-memory diagnostic screenshot before cleaning up. Successful test runs avoid this expensive diagnostic collection. These logs may include information about other Android applications; **review and redact them before sharing externally**.
+
+Process tests now explicitly close the `subprocess.Popen` output stream after a child exits or times out. The regression suite includes warnings-capture tests to detect unclosed file handles, and verifies fail-fast ADB handling and the 20-iteration case generation.
+
+All device options are additive: the unchanged `./test-all.sh` default still runs offline tests in separate child processes with the required one-second gaps and writes one consolidated TXT report.
