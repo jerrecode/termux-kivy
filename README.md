@@ -38,9 +38,9 @@ without connecting to the plugin; use `--connect` for a real Termux:GUI handshak
 
 - Lazy import of the Android adapter; pure-Python core importable on desktop.
 - O(1) native ID -> widget event dispatch.
-- Incremental add/remove of views when the native container permits it.
-- Coalesced, deduplicated property updates.
-- Fixed lifecycle cleanup and an event loop with bounded timer callbacks.
+- Incremental add/remove of views when the native container permits it, with recoverable deletion failure semantics.
+- Coalesced, deduplicated property updates; in-place ListProperty observation.
+- Exception-safe lifecycle cleanup and an event loop with bounded timer callbacks and cancelled-timer compaction.
 - Truthful compatibility layer: no global `sitecustomize` takeover or silent import hook.
 - Optional, limited KV parsing without arbitrary Python evaluation.
 - Explicit and testable Termux:GUI protocol boundaries.
