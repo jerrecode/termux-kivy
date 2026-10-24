@@ -122,6 +122,9 @@ class Widget(EventDispatcher):
     def _before_change(self, name, value):
         if self._backend is not None:
             self._backend._check_thread()
+            if name in ('orientation', 'cols', 'multiline', 'password'):
+                from .backend import UnsupportedOperation
+                raise UnsupportedOperation(f'live mutation of {name} requires re-mount')
 
     def _changed(self, name, value):
         super()._changed(name, value)
