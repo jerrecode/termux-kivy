@@ -168,7 +168,7 @@ class TermuxBackend:
                     if native_id in self._index:
                         raise RuntimeError(f"duplicate native View ID: {native_id}")
                     self._index[native_id] = node
-                self._state[node] = {}
+                self._state[node] = self._initial_native_state(node)
                 added.append(node)
                 self.stats["created"] += 1
                 self._initial_style(node)
@@ -185,6 +185,28 @@ class TermuxBackend:
             if added:
                 self._detach(added[0], delete=True)
             raise
+
+    @staticmethod
+    def _initial_native_state(node):
+        """Cache only values whose initial native state is known."""
+        state = {"visible": 2}
+        if isinstance(node, (Button, TextInput, CheckBox, Spinner)):
+            state["clickable"] = True
+        if isinstance(node, CheckBox):
+            state["active"] = node.active
+        if isinstance(node, ToggleButton):
+            state["checked"] = node.state == "down"
+        if isinstance(node, (Label, TextInput)) and not isinstance(
+            node, (Spinner, ToggleButton)
+        ):
+            state["text"] = node.text
+        if isinstance(node, Spinner):
+            state["values"] = tuple(node.values)
+            if node.text in node.values:
+                state["selected"] = node.values.index(node.text)
+        if isinstance(node, Image) and node.source:
+            state["source"] = node.source
+        return state
 
     def _initial_style(self, node):
         n = node._native
@@ -320,7 +342,11 @@ class TermuxBackend:
                 raise ValueError("ProgressBar.max must be positive")
             key, value, fn = "progress", max(0, min(100, round(node.value * 100 / node.max))), n.setprogress
         elif name == "disabled":
-            # setclickable is supported, but not a complete Android disabled style.
+            # Changing TextView/FrameLayout clickability implicitly would be
+            # behavior-changing and generate wasteful cross-process calls.
+            if not isinstance(node, (Button, TextInput, CheckBox, Spinner)):
+                return
+            # setclickable is not a complete Android disabled style.
             key, value, fn = "clickable", not node.disabled, n.setclickable
         else:
             return
