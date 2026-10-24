@@ -12,6 +12,9 @@ license = {text = "MIT"}
 keywords = ["termux", "termuxgui", "android", "kivy", "gui"]
 dependencies = []
 
+[project.scripts]
+termux-kivy = "termux_kivy.__main__:main"
+
 [project.optional-dependencies]
 android = ["termuxgui>=0.1.5"]
 
