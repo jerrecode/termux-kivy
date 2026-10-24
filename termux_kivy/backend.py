@@ -261,7 +261,7 @@ class TermuxBackend:
         if name in ("orientation", "cols", "multiline", "password"):
             raise UnsupportedOperation(f"live mutation of {name} requires re-mount")
         state = self._state[node]
-        if name in ("text", "font_size") and isinstance(node, (Label, TextInput)) and not isinstance(node, Spinner):
+        if name in ("text", "font_size") and isinstance(node, (Label, TextInput)) and not isinstance(node, (Spinner, ToggleButton)):
             value = node.text if name == "text" else (
                 int(round(node.font_size)) if isinstance(node, Label) else None
             )
