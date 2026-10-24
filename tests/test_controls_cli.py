@@ -24,16 +24,17 @@ class ControlTests(unittest.TestCase):
 
     def test_native_spinner_and_toggle(self):
         spinner = self.root.add_widget(Spinner(text="one", values=["one", "two"]))
-        toggle = self.root.add_widget(ToggleButton(text="Enable"))
+        toggle = self.root.add_widget(ToggleButton())
         self.backend.mount(self.root)
         self.backend.flush()
         self.assertEqual(spinner._native.kwargs["parent_id"], self.root._native.id)
-        self.backend.handle_event(event("itemselected", spinner._native, selected=1))
+        self.backend.handle_event(event("itemselected", spinner._native, selected="two"))
         self.backend.handle_event(event("click", toggle._native, set=True))
         self.backend.flush()
         self.assertEqual(spinner.text, "two")
         self.assertEqual(toggle.state, "down")
-        self.assertIn(("setchecked", (True,)), toggle._native.calls)
+        # Native Android already applied the user's click; avoid a redundant IPC.
+        self.assertNotIn(("setchecked", (True,)), toggle._native.calls)
 
     def test_image_path_limit_and_update(self):
         with tempfile.TemporaryDirectory() as tmp:
