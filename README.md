@@ -1,0 +1,31 @@
+# termux-kivy
+
+A **clean-room, native-Android, Kivy-inspired** Python UI runtime for Termux:GUI.
+
+This is a new implementation, not a copy of `tgk` or `tgk-tools`, and **not the full Kivy graphics engine**. It targets familiar Python widget trees, reactive properties, application lifecycle, and native Termux:GUI views. Compatibility is explicit and capability-limited rather than pretending to implement OpenGL canvas instructions.
+
+## Status
+
+Early functional implementation. Desktop/mock integration tests run without Android; the actual Android Termux:GUI path requires device testing. See [Architecture](docs/architecture.md) and [Capabilities](docs/capabilities.md).
+
+## Quick start on Android
+
+1. Install Termux and the matching **Termux:GUI** Android plugin from compatible sources.
+2. In Termux run `pkg install python git`.
+3. Clone this repository, then execute `./install-termux.sh`.
+4. Run `python examples/counter.py`.
+
+The Python bindings are provided by the independent `termuxgui` project. No root privileges and no Kivy/SDL/OpenGL runtime are needed for native controls.
+
+## Design priorities
+
+- Lazy import of the Android adapter; pure-Python core importable on desktop.
+- O(1) native ID -> widget event dispatch.
+- Incremental add/remove of views when the native container permits it.
+- Coalesced, deduplicated property updates.
+- Fixed lifecycle cleanup and an event loop with bounded timer callbacks.
+- Truthful compatibility layer: no global `sitecustomize` takeover or silent import hook.
+- Optional, limited KV parsing without arbitrary Python evaluation.
+- Explicit and testable Termux:GUI protocol boundaries.
+
+License: MIT.
