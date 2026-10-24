@@ -221,6 +221,61 @@ def stop_fixture(process):
         process.wait(timeout=5)
 
 
+def ensure_foreground(adb, serial, timeout):
+    require_foreground(adb_run, adb, serial, timeout=timeout)
+
+
+def check_orientation(adb, serial, remote, timeout):
+    """Test landscape once and restore Android user rotation even on errors."""
+    old_auto = snapshot_android_setting(adb_run, adb, serial, "system",
+                                        "accelerometer_rotation")
+    old_rotation = snapshot_android_setting(adb_run, adb, serial, "system",
+                                            "user_rotation")
+    log(f"ORIENTATION original auto={old_auto!r} rotation={old_rotation!r}")
+    try:
+        adb_run(adb, serial, "shell", "settings", "put", "system",
+                "accelerometer_rotation", "0")
+        adb_run(adb, serial, "shell", "settings", "put", "system",
+                "user_rotation", "1")
+        time.sleep(2)
+        ensure_foreground(adb, serial, timeout)
+        nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
+        verify_geometry(nodes, adb, serial, count=1)
+        log("ORIENTATION PASS: landscape viewport has valid native control geometry")
+    finally:
+        restore_android_setting(adb_run, adb, serial, "system",
+                                "user_rotation", old_rotation)
+        restore_android_setting(adb_run, adb, serial, "system",
+                                "accelerometer_rotation", old_auto)
+        log("ORIENTATION restored original Android rotation settings")
+
+
+def check_display_matrix(adb, serial, remote, timeout):
+    """Test a smaller viewport once and restore the original override."""
+    physical, override = screen_size_settings(
+        adb_run(adb, serial, "shell", "wm", "size"))
+    original = override or physical
+    target = (max(360, int(original[0] * .8)),
+              max(640, int(original[1] * .8)))
+    log(f"DISPLAY MATRIX original={original!r}, original_override={override!r}, "
+        f"temporary={target!r}")
+    try:
+        adb_run(adb, serial, "shell", "wm", "size",
+                f"{target[0]}x{target[1]}")
+        time.sleep(2)
+        ensure_foreground(adb, serial, timeout)
+        nodes = read_ui(adb, serial, remote, expected_package="com.termux.gui")
+        verify_geometry(nodes, adb, serial, count=1)
+        log("DISPLAY MATRIX PASS: valid geometry at reduced viewport")
+    finally:
+        if override is not None:
+            adb_run(adb, serial, "shell", "wm", "size",
+                    f"{override[0]}x{override[1]}")
+        else:
+            adb_run(adb, serial, "shell", "wm", "size", "reset")
+        log("DISPLAY MATRIX restored original Android display resolution")
+
+
 def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
         orientation_check=False, display_matrix=False):
     state = adb_run(adb, serial, "get-state").strip()
