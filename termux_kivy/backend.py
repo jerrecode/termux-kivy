@@ -365,8 +365,9 @@ class TermuxBackend:
                     if processed == 0 and not self._stopping:
                         time.sleep(min(self.idle_seconds, Clock.until_next(self.idle_seconds)))
             finally:
+                closing_activity = self.activity
                 try:
                     self._close()
                 finally:
-                    if not self._stopping and self.activity is not None:
-                        self.activity.finish()
+                    if closing_activity is not None and not closing_activity.finished if hasattr(closing_activity, 'finished') else closing_activity is not None and not self._stopping:
+                        closing_activity.finish()
