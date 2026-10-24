@@ -81,62 +81,72 @@ class TermuxBackend:
 
     def _create(self, node, parent):
         tg, a = self.tg, self.activity
-        if isinstance(node, BoxLayout):
-            native = tg.LinearLayout(a, parent, vertical=node.orientation == "vertical")
-        elif isinstance(node, GridLayout):
-            cols = int(node.cols)
-            if cols != node.cols or cols < 1:
-                raise ValueError("GridLayout.cols must be positive integer")
-            native = tg.GridLayout(a, max(1, math.ceil(len(node.children) / cols)), cols, parent)
-        elif isinstance(node, ScrollView):
-            if len(node.children) > 1:
-                raise ValueError("ScrollView has more than one child")
-            native = tg.NestedScrollView(a, parent)
-        elif isinstance(node, FloatLayout) or type(node) is Widget:
-            native = tg.FrameLayout(a, parent)
-        elif isinstance(node, TextInput):
-            inputtype = "textPassword" if node.password else (
-                "textMultiLine" if node.multiline else "text"
-            )
-            native = tg.EditText(
-                a, node.text, parent, singleline=not node.multiline, inputtype=inputtype
-            )
-            native.sendtextevent(True)
-        elif isinstance(node, ToggleButton):
-            native = tg.ToggleButton(a, parent, checked=node.state == 'down')
-            if node.text:
-                raise UnsupportedOperation(
-                    "Termux:GUI ToggleButton cannot display custom text; "
-                    "use a separate Label beside the toggle"
+        native = None
+        try:
+            if isinstance(node, BoxLayout):
+                native = tg.LinearLayout(a, parent, vertical=node.orientation == "vertical")
+            elif isinstance(node, GridLayout):
+                cols = int(node.cols)
+                if cols != node.cols or cols < 1:
+                    raise ValueError("GridLayout.cols must be positive integer")
+                native = tg.GridLayout(a, max(1, math.ceil(len(node.children) / cols)), cols, parent)
+            elif isinstance(node, ScrollView):
+                if len(node.children) > 1:
+                    raise ValueError("ScrollView has more than one child")
+                native = tg.NestedScrollView(a, parent)
+            elif isinstance(node, FloatLayout) or type(node) is Widget:
+                native = tg.FrameLayout(a, parent)
+            elif isinstance(node, TextInput):
+                inputtype = "textPassword" if node.password else (
+                    "textMultiLine" if node.multiline else "text"
                 )
-            native.sendclickevent(True)
-        elif isinstance(node, Button):
-            native = tg.Button(a, node.text, parent)
-            native.sendclickevent(True)
-        elif isinstance(node, Switch):
-            native = tg.Switch(a, node.text, parent, checked=node.active)
-            native.sendclickevent(True)
-        elif isinstance(node, CheckBox):
-            native = tg.Checkbox(a, node.text, parent, checked=node.active)
-            native.sendclickevent(True)
-        elif isinstance(node, Spinner):
-            native = tg.Spinner(a, parent)
-            native.setlist([str(x) for x in node.values])
-            if node.text in node.values:
-                native.selectitem(node.values.index(node.text))
-        elif isinstance(node, Image):
-            native = tg.ImageView(a, parent)
-            if node.source:
-                native.setimage(self._read_image(node.source))
-        elif isinstance(node, Label):
-            native = tg.TextView(a, node.text, parent)
-        elif isinstance(node, ProgressBar):
-            native = tg.ProgressBar(a, parent)
-        else:
-            raise UnsupportedOperation(
-                f"No native Termux:GUI mapping for {type(node).__name__}"
-            )
-        return native
+                native = tg.EditText(
+                    a, node.text, parent, singleline=not node.multiline, inputtype=inputtype
+                )
+                native.sendtextevent(True)
+            elif isinstance(node, ToggleButton):
+                if node.text:
+                    raise UnsupportedOperation(
+                        "Termux:GUI ToggleButton cannot display custom text; "
+                        "use a separate Label beside the toggle"
+                    )
+                native = tg.ToggleButton(a, parent, checked=node.state == "down")
+                native.sendclickevent(True)
+            elif isinstance(node, Button):
+                native = tg.Button(a, node.text, parent)
+                native.sendclickevent(True)
+            elif isinstance(node, Switch):
+                native = tg.Switch(a, node.text, parent, checked=node.active)
+                native.sendclickevent(True)
+            elif isinstance(node, CheckBox):
+                native = tg.Checkbox(a, node.text, parent, checked=node.active)
+                native.sendclickevent(True)
+            elif isinstance(node, Spinner):
+                native = tg.Spinner(a, parent)
+                native.setlist([str(x) for x in node.values])
+                if node.text in node.values:
+                    native.selectitem(node.values.index(node.text))
+            elif isinstance(node, Image):
+                contents = self._read_image(node.source) if node.source else None
+                native = tg.ImageView(a, parent)
+                if contents is not None:
+                    native.setimage(contents)
+            elif isinstance(node, Label):
+                native = tg.TextView(a, node.text, parent)
+            elif isinstance(node, ProgressBar):
+                native = tg.ProgressBar(a, parent)
+            else:
+                raise UnsupportedOperation(
+                    f"No native Termux:GUI mapping for {type(node).__name__}"
+                )
+            return native
+        except BaseException:
+            if native is not None:
+                try:
+                    native.delete()
+                except Exception:
+                    pass
+            raise
 
     def mount(self, root, parent=None):
         self._check_thread()
