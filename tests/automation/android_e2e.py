@@ -20,6 +20,10 @@ import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
+from android_diagnostics import (
+    capture, collect_failure, pixels_changed, require_foreground,
+    restore_android_setting, screen_size_settings, snapshot_android_setting,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -80,12 +84,22 @@ def await_condition(name, function, *, timeout=12, interval=0.15):
     raise AssertionError(f"Timed out waiting for {name} after {timeout}s")
 
 
-def read_ui(adb, serial, remote):
+def read_ui(adb, serial, remote, *, expected_package=None):
     adb_run(adb, serial, "shell", "uiautomator", "dump", remote, timeout=30)
     xml = adb_run(adb, serial, "shell", "cat", remote, timeout=15)
     if not xml.lstrip().startswith("<?xml") and not xml.lstrip().startswith("<hierarchy"):
         raise ValueError(f"ADB UI hierarchy is not valid XML: {xml[:400]!r}")
     root = ET.fromstring(xml)
+    if expected_package is not None:
+        packages = [
+            item.attrib.get("package", "")
+            for item in root.iter("node")
+            if item.attrib.get("text", "").startswith("TK-E2E-")
+            or item.attrib.get("class", "").endswith("EditText")
+        ]
+        check(bool(packages) and all(p == expected_package for p in packages),
+              "test fixture owns visible target controls (not a different foreground app)",
+              expected=expected_package, actual=packages)
     nodes = []
     for item in root.iter("node"):
         value = item.attrib
@@ -95,6 +109,7 @@ def read_ui(adb, serial, remote):
         left, top, right, bottom = map(int, match.groups())
         nodes.append({
             "text": value.get("text", ""),
+            "package": value.get("package", ""),
             "class": value.get("class", ""),
             "desc": value.get("content-desc", ""),
             "bounds": (left, top, right, bottom),
@@ -137,14 +152,14 @@ def tap(adb, serial, node):
     adb_run(adb, serial, "shell", "input", "tap", str(x), str(y))
 
 
-def verify_geometry(nodes, adb, serial):
+def verify_geometry(nodes, adb, serial, *, count=0):
     display = adb_run(adb, serial, "shell", "wm", "size")
     size = re.search(r"(?:Physical|Override) size:\s*(\d+)x(\d+)", display)
     if not size:
         raise AssertionError(f"Cannot determine Android screen dimensions: {display!r}")
     w, h = map(int, size.groups())
     ready = by_text(nodes, "TK-E2E-READY")
-    status = by_text(nodes, "TK-E2E-COUNT:0")
+    status = by_text(nodes, f"TK-E2E-COUNT:{count}")
     button = by_text(nodes, "TK-E2E-TAP")
     field = by_class(nodes, "EditText")
     checkbox = by_text(nodes, "TK-E2E-CHECK")
@@ -206,7 +221,8 @@ def stop_fixture(process):
         process.wait(timeout=5)
 
 
-def run(adb, serial):
+def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
+        orientation_check=False, display_matrix=False):
     state = adb_run(adb, serial, "get-state").strip()
     check(state == "device", "authorized ADB device available",
           expected="device", actual=state)
@@ -304,9 +320,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--adb", default="adb")
     parser.add_argument("--serial")
+    parser.add_argument("--foreground-timeout", type=float, default=4)
+    parser.add_argument("--save-screenshots", action="store_true")
+    parser.add_argument("--orientation-check", action="store_true")
+    parser.add_argument("--display-matrix", action="store_true")
     args = parser.parse_args(argv)
     try:
-        return run(args.adb, args.serial)
+        return run(args.adb, args.serial,
+                   foreground_timeout=args.foreground_timeout,
+                   save_screenshots=args.save_screenshots,
+                   orientation_check=args.orientation_check,
+                   display_matrix=args.display_matrix)
     except BaseException as exc:
         import traceback
         log(f"REAL ANDROID FAILURE: {type(exc).__name__}: {exc}")
