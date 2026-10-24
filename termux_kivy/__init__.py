@@ -6,17 +6,17 @@ __version__ = "0.1.0"
 
 from .core import (
     App, BooleanProperty, BoxLayout, Button, CheckBox, Clock,
-    EventDispatcher, FloatLayout, GridLayout, Label, ListProperty,
+    EventDispatcher, FloatLayout, GridLayout, Image, Label, ListProperty,
     NumericProperty, ObjectProperty, ProgressBar, Property, ScrollView,
-    StringProperty, Switch, TextInput, Widget,
+    Spinner, StringProperty, Switch, TextInput, ToggleButton, Widget,
 )
 from .backend import TermuxBackend, UnsupportedOperation
 from .kv import Builder, Factory, KVError
 
 __all__ = [
     "App", "BooleanProperty", "BoxLayout", "Button", "CheckBox", "Clock",
-    "EventDispatcher", "FloatLayout", "GridLayout", "Label", "ListProperty",
+    "EventDispatcher", "FloatLayout", "GridLayout", "Image", "Label", "ListProperty",
     "NumericProperty", "ObjectProperty", "ProgressBar", "Property",
-    "ScrollView", "StringProperty", "Switch", "TextInput", "Widget",
+    "ScrollView", "Spinner", "StringProperty", "Switch", "TextInput", "ToggleButton", "Widget",
     "TermuxBackend", "UnsupportedOperation", "Builder", "Factory", "KVError",
 ]
