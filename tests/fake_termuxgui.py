@@ -57,6 +57,8 @@ class EditText(_View):
     def gettext(self):
         return self.text
 class Checkbox(Button):
+    _METHODS = Button._METHODS | {"setchecked"}
+
     def __init__(self, activity, text, parent=None, checked=False):
         super().__init__(activity, text, parent)
         self.kwargs["checked"] = checked
