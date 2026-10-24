@@ -35,6 +35,9 @@ class Property:
         old = self.__get__(instance)
         if old == value:
             return
+        before = getattr(instance, '_before_change', None)
+        if before is not None:
+            before(self.name, value)
         instance.__dict__[self.name] = value
         instance._changed(self.name, value)
 
@@ -115,6 +118,10 @@ class Widget(EventDispatcher):
         self._backend = None
         self._native = None
         super().__init__(**kwargs)
+
+    def _before_change(self, name, value):
+        if self._backend is not None:
+            self._backend._check_thread()
 
     def _changed(self, name, value):
         super()._changed(name, value)
