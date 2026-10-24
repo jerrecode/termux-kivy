@@ -319,6 +319,11 @@ class TermuxBackend:
         fn(value)
         state[key] = value
         self.stats["updated"] += 1
+        if name == "values" and isinstance(node, Spinner):
+            # setlist can reset native selection even when the desired label
+            # stays unchanged; reselect after the new list is installed.
+            state.pop("selected", None)
+            self.invalidate(node, "text")
 
     def flush(self, budget=2048):
         self._check_thread()
