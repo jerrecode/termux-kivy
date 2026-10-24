@@ -59,16 +59,34 @@ class Transcript:
                 print(line, end="", flush=True)
 
     def save(self, filename: Path):
+        """Atomically publish exactly one persistent UTF-8 report at the end."""
         with self.lock:
             filename.parent.mkdir(parents=True, exist_ok=True)
             self.buffer.flush()
             self.buffer.seek(0)
-            # Do not hold the entire report in RAM.
-            with filename.open("w", encoding="utf-8", newline="\n") as output:
-                shutil.copyfileobj(self.buffer, output, length=128 * 1024)
-                output.flush()
-                os.fsync(output.fileno())
-            self.buffer.close()
+            temporary = None
+            try:
+                # Keep incomplete reports hidden under a temporary filename.
+                # os.replace() makes the final filename visible only after
+                # the entire transcript was flushed and fsynced.
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", newline="\n",
+                    dir=str(filename.parent), prefix="." + filename.name + ".",
+                    suffix=".tmp", delete=False,
+                ) as output:
+                    temporary = Path(output.name)
+                    shutil.copyfileobj(self.buffer, output, length=128 * 1024)
+                    output.flush()
+                    os.fsync(output.fileno())
+                os.replace(temporary, filename)
+                temporary = None
+            finally:
+                self.buffer.close()
+                if temporary is not None:
+                    try:
+                        temporary.unlink()
+                    except FileNotFoundError:
+                        pass
         return filename
 
 
