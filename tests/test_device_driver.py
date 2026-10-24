@@ -79,6 +79,58 @@ class ADBGeometryTests(unittest.TestCase):
         self.assertEqual(nodes[1]["bounds"], (0, 100, 360, 160))
         self.assertEqual(nodes[1]["text"], "TK-E2E-TAP")
 
+    def test_reject_foreign_foreground_ui(self):
+        xml = """<?xml version="1.0"?>
+<hierarchy><node text="TK-E2E-READY" class="android.widget.TextView"
+package="com.termux" bounds="[0,0][360,50]"/></hierarchy>"""
+        with patch.object(driver, "adb_run", side_effect=["dump complete", xml]):
+            with self.assertRaises(AssertionError):
+                driver.read_ui("adb", None, "/sdcard/ui.xml",
+                               expected_package="com.termux.gui")
+
+    def test_display_override_used_for_geometry_not_physical_size(self):
+        with patch.object(driver, "adb_run",
+                          return_value="Physical size: 1080x2392\\nOverride size: 360x720"):
+            driver.verify_geometry(screen(), "adb", None)
+        overwide = screen()
+        overwide[0] = node("TK-E2E-READY", (0, 0, 480, 50))
+        with patch.object(driver, "adb_run",
+                          return_value="Physical size: 1080x2392\\nOverride size: 360x720"):
+            with self.assertRaises(AssertionError):
+                driver.verify_geometry(overwide, "adb", None)
+
+    def test_orientation_failure_always_restores_settings(self):
+        restored = []
+        def restore(*args):
+            restored.append(args[-2:])
+        with patch.object(driver, "snapshot_android_setting",
+                          side_effect=["1", "0"]), \\
+             patch.object(driver, "capture",
+                          return_value={"dimensions": (1080, 2392)}), \\
+             patch.object(driver, "adb_run", return_value=""), \\
+             patch.object(driver, "ensure_foreground"), \\
+             patch.object(driver.time, "sleep"), \\
+             patch.object(driver, "read_ui", side_effect=RuntimeError("UI lost")), \\
+             patch.object(driver, "restore_android_setting", side_effect=restore):
+            with self.assertRaises(RuntimeError):
+                driver.check_orientation("adb", None, "/sdcard/test.xml", 4)
+        self.assertEqual(restored, [
+            ("user_rotation", "0"), ("accelerometer_rotation", "1")
+        ])
+
+    def test_display_failure_resets_override(self):
+        calls = []
+        def fake(*args, **kwargs):
+            calls.append(args)
+            return "Physical size: 1080x2392"
+        with patch.object(driver, "adb_run", side_effect=fake), \\
+             patch.object(driver.time, "sleep"), \\
+             patch.object(driver, "ensure_foreground"), \\
+             patch.object(driver, "read_ui", side_effect=RuntimeError("lost GUI")):
+            with self.assertRaises(RuntimeError):
+                driver.check_display_matrix("adb", None, "/sdcard/test.xml", 4)
+        self.assertIn(("adb", None, "shell", "wm", "size", "reset"), calls)
+
     def test_reject_invalid_hierarchy(self):
         with patch.object(driver, "adb_run", side_effect=["done", "NO_XML"]):
             with self.assertRaises(ValueError):
