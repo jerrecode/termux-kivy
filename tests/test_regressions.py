@@ -170,7 +170,7 @@ class RegressionTests(unittest.TestCase):
             def finish(self):
                 calls.append(("finish", self.connection.closed))
                 super().finish()
-        plugin = SimpleNamespace(Connection=Connection, Activity=TrackingActivity)
+        plugin = SimpleNamespace(Connection=Connection, Activity=TrackingActivity, TextView=fake.TextView)
         backend = TermuxBackend(plugin, idle_seconds=0)
         root = Label(text="hello")
         backend.run(root, on_start=backend.stop)
