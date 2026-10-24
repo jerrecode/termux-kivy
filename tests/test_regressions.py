@@ -126,6 +126,27 @@ class RegressionTests(unittest.TestCase):
         self.assertFalse(self.backend._state)
         self.assertTrue(all(n._backend is None for n in self.root.walk()))
 
+    def test_failed_native_delete_keeps_model_mounted(self):
+        button = self.root.add_widget(Button(text="temporary"))
+        self.backend.mount(self.root)
+        native = button._native
+        delete = native.delete
+
+        def failure():
+            raise OSError("transient delete failure")
+
+        native.delete = failure
+        with self.assertRaises(OSError):
+            self.root.remove_widget(button)
+        self.assertIs(button.parent, self.root)
+        self.assertIs(button._backend, self.backend)
+        self.assertIs(self.backend._index[native.id], button)
+        native.delete = delete
+        self.root.remove_widget(button)
+        self.assertIsNone(button.parent)
+        self.assertIsNone(button._backend)
+        self.assertNotIn(native.id, self.backend._index)
+
     def test_invalid_live_properties_are_atomic(self):
         toggle = self.root.add_widget(ToggleButton())
         progress = self.root.add_widget(ProgressBar())
