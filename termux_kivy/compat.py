@@ -32,7 +32,8 @@ _MODULES = {
 }
 for _name in (
     "Widget", "BoxLayout", "GridLayout", "FloatLayout", "ScrollView",
-    "Label", "Button", "TextInput", "CheckBox", "Switch", "ProgressBar"
+    "Label", "Button", "TextInput", "CheckBox", "Switch", "ProgressBar",
+    "ToggleButton", "Spinner", "Image"
 ):
     _MODULES["kivy.uix." + _name.lower()] = {_name: getattr(core, _name)}
 
