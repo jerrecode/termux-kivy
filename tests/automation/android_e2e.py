@@ -366,8 +366,22 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
             )
             check(typed, "physical keyboard input reached TextInput", expected=True, actual=typed)
 
+            ensure_foreground(adb, serial, foreground_timeout)
+            after_keyboard = capture(adb, serial, "after-keyboard", output_dir=savedir)
+            check(after_keyboard["sha256"] != after_tap["sha256"],
+                  "screen content changed after checkbox and keyboard input",
+                  expected="different PNG sha256", actual=after_keyboard["sha256"])
             final = read_state(trace)
             log(f"FINAL REAL DEVICE CALLBACK TRACE: {json.dumps(final, ensure_ascii=False)}")
+            if orientation_check or display_matrix:
+                # Hide the IME without unintentionally closing the test fixture.
+                adb_run(adb, serial, "shell", "input", "keyevent", "4")
+                time.sleep(1)
+                ensure_foreground(adb, serial, foreground_timeout)
+                if orientation_check:
+                    check_orientation(adb, serial, remote, foreground_timeout)
+                if display_matrix:
+                    check_display_matrix(adb, serial, remote, foreground_timeout)
             adb_run(adb, serial, "shell", "input", "keyevent", "4")
             try:
                 await_condition("fixture termination after Android back", lambda:
@@ -383,6 +397,14 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
                   expected=0, actual=process.returncode)
             log("REAL ANDROID E2E PASS: physical tap, input, viewport and callbacks verified")
             return 0
+        except BaseException:
+            log("REAL ANDROID E2E FAILURE: collecting diagnostic snapshots")
+            collect_failure(adb_run, adb, serial, trace, process=process)
+            try:
+                capture(adb, serial, "failure-state", output_dir=savedir)
+            except Exception as capture_error:
+                log(f"Failure screenshot unavailable: {capture_error!r}")
+            raise
         finally:
             try:
                 adb_run(adb, serial, "shell", "rm", "-f", remote, timeout=8)
@@ -390,6 +412,10 @@ def run(adb, serial, *, foreground_timeout=4, save_screenshots=False,
                 log(f"Cleanup warning for on-device UI dump: {exc}")
             stop_fixture(process)
             reader.join(timeout=3)
+            if process.stdout is not None:
+                process.stdout.close()
+            log(f"FIXTURE CLEANUP pid={process.pid} code={process.returncode} "
+                f"stdout_closed={process.stdout is None or process.stdout.closed}")
 
 
 def main(argv=None):
