@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.2 — 2026-10-24
+
+### Full automated test pipeline
+
+- Add executable `./test-all.sh` and Python test runner: every discovered unittest method executes in its own child process, with a one-second pause after each process exits and before the next starts.
+- Mirror all combined stdout/stderr, assertions, actions, errors, exit codes, timestamps, timeouts and duration to a live terminal and to one temporary spooled transcript. Atomically publish **one final UTF-8 text log** after the full run, including partial results on keyboard interruption.
+- Add six scripted native-event interaction cases for button taps, Unicode keyboard input, checked-state controls, Spinner selection, layout cells, dynamic view lifetime and transient IPC failures.
+- Add an optional `--device` ADB test that launches a real Termux:GUI fixture, extracts UIAutomator screen geometry, injects touch and keyboard input, verifies actual callbacks, and checks control ordering/overlaps. Device mode explicitly fails when ADB cannot run rather than pretending that simulated tests verified native pixels.
+- Include fail-closed ADB/XML parser tests, runner timeout, nonzero exit and cooldown regression tests.
+- Extend GitHub Actions with the process-isolated suite (zero cooldown exclusively in CI) and upload its single combined log as an artifact.
+
+Validation: Python 3.10–3.13 CI successful; 45 unit tests and 51 child test runs completed on CI, all passed. **No physical Android device was available in CI for real touch/layout validation.**
+
 ## 0.1.1 — 2026-10-24
 
 ### Native protocol corrections

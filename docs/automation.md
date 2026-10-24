@@ -14,7 +14,7 @@ In addition, six scripted end-to-end scenarios are launched as individual child 
 ./test-all.sh --log-file /sdcard/Download/termux-kivy-tests.txt
 ```
 
-The default single text file is written at `logs/test-all-YYYYMMDD-HHMMSS-PID.txt`. Every child output line (stdout and stderr merged), PID, command, start/end timestamp, return code, timeout, assertion, event, layout check, exception and final summary is printed live. All are simultaneously appended to a temporary spooling buffer, which starts in memory and spills to a temporary file at 2 MiB. At the **end** of the test run (including Ctrl+C), the buffer is streamed into exactly one persistent text log. Very long tests do not have to fit entirely in memory.
+The default single text file is written at `logs/test-all-YYYYMMDD-HHMMSS-PID.txt`. Every child output line (stdout and stderr merged), PID, command, start/end timestamp, return code, timeout, assertion, event, layout check, exception and final summary is printed live. All are simultaneously appended to a temporary spooling buffer, which starts in memory and spills to a temporary file at 2 MiB. At the **end** of the test run (including Ctrl+C), the buffer is streamed into an fsynced temporary sibling and atomically renamed into exactly one persistent text log, avoiding a partially written final filename. Very long tests do not have to fit entirely in memory.
 
 The runner reports PASS/FAIL/TIMEOUT per individual test; an unsuccessful test does not hide later test results. On a timeout, the entire child process group is terminated. The final exit code is nonzero if any test fails. `--delay 0` is available for fast CI; this is an opt-out from the requested one-second default.
 
