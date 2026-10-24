@@ -445,34 +445,41 @@ class TermuxBackend:
         try:
             with self.tg.Connection() as connection:
                 self.connection = connection
-                opts = {"intercept": True}
-                if self.window_mode != "normal":
-                    opts[self.window_mode] = True
-                self.activity = self.tg.Activity(connection, **opts)
-                self.mount(root)
-                if on_start is not None:
-                    on_start()
-                while not self._stopping:
-                    processed = 0
-                    for _ in range(128):
-                        event = connection.checkevent()
-                        if event is None:
-                            break
-                        processed += 1
-                        self.handle_event(event)
+                try:
+                    opts = {"intercept": True}
+                    if self.window_mode != "normal":
+                        opts[self.window_mode] = True
+                    self.activity = self.tg.Activity(connection, **opts)
+                    self.mount(root)
+                    if on_start is not None:
+                        on_start()
+                    while not self._stopping:
+                        processed = 0
+                        for _ in range(128):
+                            event = connection.checkevent()
+                            if event is None:
+                                break
+                            processed += 1
+                            self.handle_event(event)
+                            if self._stopping:
+                                break
                         if self._stopping:
                             break
-                    if self._stopping:
-                        break
-                    self._drain_tasks()
-                    Clock.tick()
-                    self.flush()
-                    if processed == 0 and not self._stopping:
-                        time.sleep(min(self.idle_seconds, Clock.until_next(self.idle_seconds)))
+                        self._drain_tasks()
+                        Clock.tick()
+                        self.flush()
+                        if processed == 0 and not self._stopping:
+                            time.sleep(min(self.idle_seconds, Clock.until_next(self.idle_seconds)))
+                finally:
+                    # Termux:GUI methods need a live Connection. Dispose native
+                    # resources and finish the Activity before leaving its context.
+                    closing_activity = self.activity
+                    try:
+                        self._close()
+                    finally:
+                        if closing_activity is not None and not self._stopping:
+                            closing_activity.finish()
         finally:
-            closing_activity = self.activity
-            try:
+            if self._owner is not None:
+                # Also handles errors before Connection.__enter__ or Activity().
                 self._close()
-            finally:
-                if closing_activity is not None and not self._stopping:
-                    closing_activity.finish()
