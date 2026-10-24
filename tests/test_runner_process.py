@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import gc
+import warnings
 from pathlib import Path
 import os
 import subprocess
@@ -83,6 +85,49 @@ class RunnerIsolationTests(unittest.TestCase):
         self.assertIn("COOLDOWN COMPLETE", content)
         self.assertIn("FINAL STATUS: PASSED", content)
         self.assertGreaterEqual(elapsed, 1.0)
+
+    def test_children_do_not_leave_unclosed_pipe_warnings(self):
+        class SilentTranscript:
+            def write(self, *args, **kwargs):
+                pass
+        cases = [
+            runner.Case("success", (sys.executable, "-c", "print('ok')"), "unit"),
+            runner.Case("expected-failure", (sys.executable, "-c", "import sys; sys.exit(9)"), "unit"),
+            runner.Case("timeout", (sys.executable, "-c", "import time; time.sleep(10)"), "unit"),
+        ]
+        with warnings.catch_warnings(record=True) as found:
+            warnings.simplefilter("always", ResourceWarning)
+            outputs = [runner.run_case(case, SilentTranscript(), timeout=.3)
+                       for case in cases]
+            gc.collect()
+        self.assertEqual([x[0] for x in outputs], ["PASS", "FAIL", "TIMEOUT"])
+        leaked = [str(w.message) for w in found
+                  if issubclass(w.category, ResourceWarning) and
+                  "unclosed file" in str(w.message)]
+        self.assertEqual(leaked, [], leaked)
+
+    def test_repetition_builds_distinct_cases_not_parallel_threads(self):
+        cases = runner.all_cases(include_device=True, device_repeats=20,
+                                 device_options=("--foreground-timeout", "6"))
+        physical = [c for c in cases if c.kind == "device"]
+        self.assertEqual(len(physical), 20)
+        self.assertTrue(physical[0].name.endswith(".run-001"))
+        self.assertTrue(physical[-1].name.endswith(".run-020"))
+        self.assertEqual(physical[0].command, physical[-1].command)
+
+    def test_device_preflight_rejects_missing_adb_without_running_suite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            logfile = Path(directory) / "preflight.txt"
+            result = subprocess.run([
+                sys.executable, str(SCRIPT), "--device", "--filter",
+                "^android\\.", "--adb", str(Path(directory) / "no-such-adb"),
+                "--log-file", str(logfile), "--delay", "0"
+            ], cwd=ROOT, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            text = logfile.read_text(encoding="utf-8")
+            self.assertIn("ADB PREFLIGHT FAILED", text)
+            self.assertIn("FINAL STATUS: FAILED", text)
+            self.assertNotIn("SPAWNED pid=", text)
 
     def test_shell_entrypoint_has_execute_bit(self):
         if os.name == "posix":
