@@ -155,10 +155,9 @@ def tap(adb, serial, node):
 
 def verify_geometry(nodes, adb, serial, *, count=0):
     display = adb_run(adb, serial, "shell", "wm", "size")
-    size = re.search(r"(?:Physical|Override) size:\s*(\d+)x(\d+)", display)
-    if not size:
-        raise AssertionError(f"Cannot determine Android screen dimensions: {display!r}")
-    w, h = map(int, size.groups())
+    physical, override = screen_size_settings(display)
+    w, h = override or physical
+    log(f"SCREEN SIZE: physical={physical!r} override={override!r} effective={(w,h)!r}")
     ready = by_text(nodes, "TK-E2E-READY")
     status = by_text(nodes, f"TK-E2E-COUNT:{count}")
     button = by_text(nodes, "TK-E2E-TAP")
@@ -226,7 +225,7 @@ def ensure_foreground(adb, serial, timeout):
     require_foreground(adb_run, adb, serial, timeout=timeout)
 
 
-def check_orientation(adb, serial, remote, timeout):
+def check_orientation(adb, serial, remote, timeout, *, output_dir=None):
     """Test landscape once and restore Android user rotation even on errors."""
     old_auto = snapshot_android_setting(adb_run, adb, serial, "system",
                                         "accelerometer_rotation")
@@ -251,7 +250,7 @@ def check_orientation(adb, serial, remote, timeout):
         log("ORIENTATION restored original Android rotation settings")
 
 
-def check_display_matrix(adb, serial, remote, timeout):
+def check_display_matrix(adb, serial, remote, timeout, *, output_dir=None):
     """Test a smaller viewport once and restore the original override."""
     physical, override = screen_size_settings(
         adb_run(adb, serial, "shell", "wm", "size"))
