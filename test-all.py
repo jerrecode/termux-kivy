@@ -348,6 +348,8 @@ def main(argv=None):
             transcript.write(f"  {result:7} {duration:9.3f}s {name}")
         if interrupted:
             transcript.write("FINAL STATUS: INTERRUPTED")
+        elif preflight_failure:
+            transcript.write("FINAL STATUS: FAILED (ADB preflight)")
         elif failed:
             transcript.write("FINAL STATUS: FAILED")
         else:
@@ -373,7 +375,7 @@ def main(argv=None):
         except OSError as exc:
             print(f"CRITICAL: could not write final log: {exc}", file=sys.stderr, flush=True)
             raise
-    return 130 if interrupted else 1 if failed else 0
+    return 130 if interrupted else 1 if failed or preflight_failure else 0
 
 
 if __name__ == "__main__":
