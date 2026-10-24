@@ -101,7 +101,8 @@ class RegressionTests(unittest.TestCase):
         failures = [True]
         original = native.settext
         def flaky(value):
-            if failures.pop(0):
+            if failures:
+                failures.pop()
                 raise OSError("temporary connection failure")
             return original(value)
         native.settext = flaky
