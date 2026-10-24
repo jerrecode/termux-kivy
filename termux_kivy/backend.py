@@ -397,17 +397,43 @@ class TermuxBackend:
                 node.dispatch("on_release")
 
     def _close(self):
-        if self.root is not None and self.root._backend is self:
-            self.unmount(self.root)
-        self._dirty.clear()
-        self._index.clear()
-        self._state.clear()
-        self.root = None
-        self.connection = None
-        self.activity = None
-        self._owner = None
+        try:
+            if self.root is not None and self.root._backend is self:
+                if self._stopping:
+                    # The Activity is already finishing. Avoid extra IPC to
+                    # delete views that Android is disposing automatically.
+                    for node in self.root.walk():
+                        node._backend = None
+                        node._native = None
+                else:
+                    self.unmount(self.root)
+        finally:
+            # Always clear Python ownership, even if a native delete fails.
+            if self.root is not None:
+                for node in self.root.walk():
+                    node._backend = None
+                    node._native = None
+            self._dirty.clear()
+            self._index.clear()
+            self._state.clear()
+            self.root = None
+            self.connection = None
+            self.activity = None
+            self._owner = None
+            # Drop callbacks queued for the old Activity, not the next one.
+            while True:
+                try:
+                    self._tasks.get_nowait()
+                except Empty:
+                    break
 
     def stop(self):
+        # A worker may request stop, but only the UI thread can use Android.
+        if self._owner is not None and threading.get_ident() != self._owner:
+            self.post(self.stop)
+            return
+        if self._stopping:
+            return
         self._stopping = True
         if self.activity is not None:
             self.activity.finish()
@@ -416,13 +442,13 @@ class TermuxBackend:
         self._owner = threading.get_ident()
         self._stopping = False
         self.root = root
-        with self.tg.Connection() as connection:
-            self.connection = connection
-            opts = {"intercept": True}
-            if self.window_mode != "normal":
-                opts[self.window_mode] = True
-            self.activity = self.tg.Activity(connection, **opts)
-            try:
+        try:
+            with self.tg.Connection() as connection:
+                self.connection = connection
+                opts = {"intercept": True}
+                if self.window_mode != "normal":
+                    opts[self.window_mode] = True
+                self.activity = self.tg.Activity(connection, **opts)
                 self.mount(root)
                 if on_start is not None:
                     on_start()
@@ -436,15 +462,17 @@ class TermuxBackend:
                         self.handle_event(event)
                         if self._stopping:
                             break
+                    if self._stopping:
+                        break
                     self._drain_tasks()
                     Clock.tick()
                     self.flush()
                     if processed == 0 and not self._stopping:
                         time.sleep(min(self.idle_seconds, Clock.until_next(self.idle_seconds)))
+        finally:
+            closing_activity = self.activity
+            try:
+                self._close()
             finally:
-                closing_activity = self.activity
-                try:
-                    self._close()
-                finally:
-                    if closing_activity is not None and not self._stopping:
-                        closing_activity.finish()
+                if closing_activity is not None and not self._stopping:
+                    closing_activity.finish()
