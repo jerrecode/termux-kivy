@@ -11,7 +11,7 @@ class _View:
         _View._next += 1
         self.calls = []
         self.deleted = False
-        self.kwargs = kwargs
+        self.kwargs = dict(kwargs, parent_id=getattr(parent, 'id', None))
         activity.views[self.id] = self
 
     def __getattr__(self, name):
@@ -53,6 +53,12 @@ class Checkbox(Button):
 class Switch(Checkbox):
     pass
 class ProgressBar(_View):
+    pass
+class Spinner(_View):
+    pass
+class ToggleButton(_View):
+    pass
+class ImageView(_View):
     pass
 
 
