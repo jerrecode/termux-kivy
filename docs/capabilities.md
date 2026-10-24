@@ -7,7 +7,7 @@ The public import `termux_kivy` exposes basic Kivy-style names. A program must e
 | App.build/run/stop and on_start/on_stop | Implemented | One Termux:GUI Activity; synchronous UI loop |
 | Widget parenting / add/remove / walk | Implemented | Dynamic native add/remove except live GridLayout |
 | EventDispatcher.bind/unbind/dispatch | Partial | Public property and simple control events; no Kivy gesture subsystem |
-| String/Numeric/Boolean/Object/ListProperty | Partial | Values and simple change notification; in-place ListProperty mutations do not dispatch |
+| String/Numeric/Boolean/Object/ListProperty | Partial | Values and simple change notification; in-place ListProperty mutations dispatch; complete Kivy dependency properties are not implemented |
 | BoxLayout | Partial | Native LinearLayout, horizontal/vertical; no full Kivy size_hint/pos_hint |
 | GridLayout | Partial | Native Android grid with fixed rows at mount |
 | FloatLayout | Partial | Native FrameLayout; no arbitrary Kivy coordinate placement |
@@ -22,7 +22,7 @@ The public import `termux_kivy` exposes basic Kivy-style names. A program must e
 | Themes | Minimal | Explicit per-widget ARGB background integer; no design-system presets |
 | Image | Implemented subset | PNG/JPEG local file (max 8MB) to native ImageView |
 | Spinner | Implemented subset | Native Spinner with values, selected index and text synchronization |
-| ToggleButton | Implemented subset | Native ToggleButton and state synchronization |
+| ToggleButton | Implemented subset | Native ToggleButton and state synchronization; custom captions are unsupported by the plugin |
 | Slider | Planned | Requires shared-buffer drawing and touch mapping |
 | Canvas / InstructionGroup / Shader / OpenGL | Not supported | Requires separate rendering and input backend |
 | Kivy Window, gesture recognizers, multitouch | Not supported | Requires native input mappings and geometry |
