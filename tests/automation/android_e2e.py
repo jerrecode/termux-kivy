@@ -151,12 +151,29 @@ def verify_geometry(nodes, adb, serial):
     sequence = [ready, status, button, field, checkbox]
     log(f"SCREEN GEOMETRY: reported={w}x{h}; "
         f"ordered widget bounds={[node['bounds'] for node in sequence]!r}")
-    max_x, max_y = max(w, h), max(w, h)
+    # Android reports wm dimensions in device orientation, while UIAutomator
+    # uses display coordinates. Accept a consistent transposition only when
+    # all controls fit it; never allow the unrelated max(w,h) for both axes.
+    candidates = [(w, h), (h, w)]
+    valid = [
+        (width, height)
+        for width, height in candidates
+        if all(
+            0 <= node["bounds"][0] < node["bounds"][2] <= width
+            and 0 <= node["bounds"][1] < node["bounds"][3] <= height
+            for node in sequence
+        )
+    ]
+    check(bool(valid), "all controls inside one actual display orientation",
+          expected=candidates,
+          actual=[node["bounds"] for node in sequence])
+    selected = valid[0]
+    log(f"SCREEN ORIENTATION: validated logical display extent {selected!r}")
     for node in sequence:
         l, t, r, b = node["bounds"]
-        check(0 <= l < r <= max_x and 0 <= t < b <= max_y,
+        check(0 <= l < r <= selected[0] and 0 <= t < b <= selected[1],
               f"view {node['text']!r} inside physical screen extent",
-              expected=f"within 0..{max_x} and 0..{max_y}",
+              expected=f"within 0..{selected[0]} and 0..{selected[1]}",
               actual=node["bounds"])
     for upper, lower in zip(sequence, sequence[1:]):
         # Consecutive visible rows of the explicitly vertical layout should
@@ -260,8 +277,16 @@ def run(adb, serial):
             final = read_state(trace)
             log(f"FINAL REAL DEVICE CALLBACK TRACE: {json.dumps(final, ensure_ascii=False)}")
             adb_run(adb, serial, "shell", "input", "keyevent", "4")
-            await_condition("fixture termination after Android back", lambda:
-                            process.poll() is not None, timeout=7)
+            try:
+                await_condition("fixture termination after Android back", lambda:
+                                process.poll() is not None, timeout=2)
+            except AssertionError:
+                # Android IMEs usually consume the first Back press to close
+                # the soft keyboard. Only issue another if the fixture lives.
+                log("BACK: first press probably dismissed the IME; sending a second Back")
+                adb_run(adb, serial, "shell", "input", "keyevent", "4")
+                await_condition("fixture termination after second Android back", lambda:
+                                process.poll() is not None, timeout=7)
             check(process.returncode == 0, "fixture exited cleanly",
                   expected=0, actual=process.returncode)
             log("REAL ANDROID E2E PASS: physical tap, input, viewport and callbacks verified")
