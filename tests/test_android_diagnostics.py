@@ -67,6 +67,29 @@ class NativeDiagnosticTests(unittest.TestCase):
                 self.assertTrue((Path(tmp) / "landscape.png").is_file())
                 self.assertEqual(len(captured["sha256"]), 64)
 
+    def test_pillow_pixel_crop_detects_redraw(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow not installed; no pixel decoder available")
+        before = Image.new("RGB", (100, 100), "white")
+        after = before.copy()
+        for x in range(30, 40):
+            for y in range(20, 30):
+                after.putpixel((x, y), (0, 0, 0))
+        def pack(image):
+            payload = io.BytesIO()
+            image.save(payload, format="PNG")
+            return {"png": payload.getvalue()}
+        fraction = d.pixels_changed(pack(before), pack(after),
+                                    region=(25, 15, 45, 35))
+        self.assertIsNotNone(fraction)
+        self.assertGreater(fraction, 0)
+        self.assertLess(fraction, 1)
+        outside = d.pixels_changed(pack(before), pack(after),
+                                   region=(0, 0, 20, 20))
+        self.assertEqual(outside, 0)
+
     def test_display_size_override_parsing(self):
         self.assertEqual(
             d.screen_size_settings("Physical size: 1080x2392\nOverride size: 720x1280"),
