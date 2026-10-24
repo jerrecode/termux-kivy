@@ -364,7 +364,9 @@ class _ClockEvent:
         self.owner, self.number = owner, number
 
     def cancel(self):
-        self.owner._active.discard(self.number)
+        if self.number in self.owner._active:
+            self.owner._active.discard(self.number)
+            self.owner._compact_if_sparse()
 
 
 class _Clock:
@@ -383,6 +385,14 @@ class _Clock:
         self._active.add(number)
         heapq.heappush(self._queue, (time.monotonic() + delay, number, callback, delay if repeat else None))
         return _ClockEvent(self, number)
+
+    def _compact_if_sparse(self):
+        """Bound retained cancelled timers without O(n) removal per cancel."""
+        if len(self._queue) > max(128, len(self._active) * 3):
+            self._queue = [
+                job for job in self._queue if job[1] in self._active
+            ]
+            heapq.heapify(self._queue)
 
     def schedule_once(self, callback, timeout=0):
         return self._schedule(callback, timeout, False)
