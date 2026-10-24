@@ -144,8 +144,9 @@ class Demo(App):
                 actual=(self.checkbox.active, self.toggle.state))
 
     def scenario_layout(self):
-        grid = self.root_layout.add_widget(GridLayout(cols=2))
+        grid = GridLayout(cols=2)
         cells = [grid.add_widget(Button(text=f"Cell {i}")) for i in range(5)]
+        self.root_layout.add_widget(grid)
         # Dynamic insertion into a freshly mounted GridLayout is deliberately
         # restricted. We inserted all cells before mounting the grid.
         log("LAYOUT", "Mounting fixed 2-column GridLayout with five buttons")
